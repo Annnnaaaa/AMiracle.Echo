@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <PackageId>AMiracle.Echo.Server</PackageId>
+    <Description>ASP.NET Core endpoints and services for AMiracle.Echo.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\AMiracle.Echo.Abstractions\AMiracle.Echo.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\admin.html" />
+    <EmbeddedResource Include="Resources\widget.js" />
+  </ItemGroup>
+
+</Project>

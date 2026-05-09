@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AMiracle.Echo — Admin</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#6b7280; --border:#e5e7eb; --primary:#4f46e5; --row-hover:#f9fafb; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f0f12; --fg:#f4f4f5; --muted:#9ca3af; --border:#27272a; --row-hover:#18181b; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background: var(--bg); color: var(--fg); }
+  header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 53px); }
+  aside { border-right: 1px solid var(--border); padding: 12px; overflow: auto; }
+  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 8px 0; }
+  aside .project { padding: 8px; border-radius: 6px; cursor: pointer; }
+  aside .project:hover { background: var(--row-hover); }
+  aside .project.active { background: var(--primary); color: #fff; }
+  aside .project small { display: block; opacity: .7; }
+  section { padding: 16px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+  tr.row { cursor: pointer; }
+  tr.row:hover td { background: var(--row-hover); }
+  button, input, select, textarea { font-family: inherit; font-size: 14px; color: inherit; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; }
+  button.primary { background: var(--primary); color: #fff; border: 0; cursor: pointer; }
+  button.danger { background: #b91c1c; color: #fff; border: 0; cursor: pointer; }
+  button.ghost { background: transparent; cursor: pointer; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); }
+  .pill.new { background: #dbeafe; color: #1e40af; border: 0; }
+  .pill.triaged { background: #fde68a; color: #78350f; border: 0; }
+  .pill.resolved { background: #d1fae5; color: #064e3b; border: 0; }
+  .grid { display: grid; gap: 8px; }
+  details { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+  pre { white-space: pre-wrap; word-break: break-word; background: var(--row-hover); padding: 10px; border-radius: 6px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 20px; background: var(--bg); color: var(--fg); width: min(420px, 92vw); }
+  dialog::backdrop { background: rgba(0,0,0,.4); }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field { margin-bottom: 12px; }
+  .field input, .field textarea { width: 100%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AMiracle.Echo — Admin</h1>
+  <div class="spacer"></div>
+  <input id="token" placeholder="Admin bearer token" type="password" style="width:280px">
+  <button class="primary" id="saveToken">Save</button>
+  <button class="ghost" id="logout">Forget token</button>
+</header>
+<main>
+  <aside>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <h2>Projects</h2>
+      <button class="ghost" id="newProject" title="New project">+ New</button>
+    </div>
+    <div id="projects"></div>
+  </aside>
+  <section>
+    <div class="toolbar">
+      <select id="filterStatus">
+        <option value="">All statuses</option><option value="new">new</option><option value="triaged">triaged</option><option value="resolved">resolved</option>
+      </select>
+      <select id="filterType">
+        <option value="">All types</option><option value="text">text</option><option value="voice">voice</option>
+      </select>
+      <button class="ghost" id="refresh">Refresh</button>
+    </div>
+    <div id="feedbacksContainer"><div class="empty">Pick a project from the left.</div></div>
+  </section>
+</main>
+
+<dialog id="projectDialog">
+  <h3 id="projectDialogTitle">New project</h3>
+  <div class="field"><label>Name</label><input id="projName"></div>
+  <div class="field"><label>Allowed origins (comma-separated)</label><input id="projOrigins" placeholder="https://example.com"></div>
+  <div class="field"><label>Retention days (blank = forever)</label><input id="projRetention" type="number" min="1"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="ghost" id="projCancel">Cancel</button>
+    <button class="primary" id="projSave">Save</button>
+  </div>
+</dialog>
+
+<dialog id="feedbackDialog">
+  <h3>Feedback</h3>
+  <div id="feedbackBody"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+    <button class="danger" id="fbDelete">Delete</button>
+    <button class="ghost" id="fbClose">Close</button>
+  </div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const state = { token: localStorage.getItem("echoToken") || "", projects: [], activeProject: null, feedbacks: [] };
+
+$("#token").value = state.token;
+$("#saveToken").onclick = () => { state.token = $("#token").value.trim(); localStorage.setItem("echoToken", state.token); loadProjects(); };
+$("#logout").onclick = () => { state.token = ""; localStorage.removeItem("echoToken"); $("#token").value = ""; render(); };
+$("#refresh").onclick = () => loadFeedbacks();
+$("#filterStatus").onchange = () => loadFeedbacks();
+$("#filterType").onchange = () => loadFeedbacks();
+$("#newProject").onclick = () => openProjectDialog();
+$("#projCancel").onclick = () => $("#projectDialog").close();
+$("#projSave").onclick = saveProject;
+$("#fbClose").onclick = () => $("#feedbackDialog").close();
+
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({ "Authorization": "Bearer " + state.token, "Content-Type": "application/json" }, opts.headers || {});
+  const r = await fetch("/api/v1" + path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.status === 204 ? null : r.json();
+}
+
+async function loadProjects() {
+  if (!state.token) { renderProjects([]); return; }
+  try { state.projects = await api("/admin/projects"); }
+  catch (e) { alert("Token rejected or server error: " + e.message); return; }
+  renderProjects(state.projects);
+  if (state.projects.length && !state.activeProject) selectProject(state.projects[0]);
+}
+
+function renderProjects(list) {
+  const root = $("#projects");
+  root.innerHTML = "";
+  for (const p of list) {
+    const div = document.createElement("div");
+    div.className = "project" + (state.activeProject?.id === p.id ? " active" : "");
+    div.innerHTML = `<div>${esc(p.name)}</div><small>${esc(p.publicKey)}</small>`;
+    div.onclick = () => selectProject(p);
+    root.appendChild(div);
+  }
+}
+
+function selectProject(p) {
+  state.activeProject = p;
+  renderProjects(state.projects);
+  loadFeedbacks();
+}
+
+async function loadFeedbacks() {
+  if (!state.activeProject) return;
+  const params = new URLSearchParams({ projectId: state.activeProject.id, limit: "100" });
+  if ($("#filterStatus").value) params.set("status", $("#filterStatus").value);
+  if ($("#filterType").value) params.set("type", $("#filterType").value);
+  const page = await api("/admin/feedbacks?" + params.toString());
+  state.feedbacks = page.items;
+  renderFeedbacks();
+}
+
+function renderFeedbacks() {
+  const root = $("#feedbacksContainer");
+  if (!state.feedbacks.length) { root.innerHTML = `<div class="empty">No feedback yet.</div>`; return; }
+  const rows = state.feedbacks.map(f => `
+    <tr class="row" data-id="${f.id}">
+      <td>${new Date(f.createdAt).toLocaleString()}</td>
+      <td>${f.type}</td>
+      <td>${esc((f.text || "").slice(0, 80))}${f.text && f.text.length > 80 ? "…" : ""}</td>
+      <td><span class="pill ${f.status}">${f.status}</span></td>
+      <td>${f.priority ?? ""}</td>
+      <td>${f.category ?? ""}</td>
+    </tr>`).join("");
+  root.innerHTML = `<table>
+    <thead><tr><th>When</th><th>Type</th><th>Text</th><th>Status</th><th>Pri</th><th>Cat</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+  root.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => openFeedback(tr.dataset.id));
+}
+
+async function openFeedback(id) {
+  const fb = await api("/admin/feedbacks/" + id);
+  $("#feedbackBody").innerHTML = renderFeedbackDetail(fb);
+  $("#fbDelete").onclick = async () => {
+    if (!confirm("Permanently delete this feedback?")) return;
+    await api("/admin/feedbacks/" + id, { method: "DELETE" });
+    $("#feedbackDialog").close();
+    loadFeedbacks();
+  };
+  $("#feedbackDialog").showModal();
+  // Wire status/priority/category edits.
+  $("#fbStatus")?.addEventListener("change", e => patchFb(id, { status: e.target.value }));
+  $("#fbPriority")?.addEventListener("change", e => patchFb(id, { priority: e.target.value ? Number(e.target.value) : null }));
+  $("#fbCategory")?.addEventListener("change", e => patchFb(id, { category: e.target.value || null }));
+}
+
+async function patchFb(id, body) {
+  await api("/admin/feedbacks/" + id, { method: "PATCH", body: JSON.stringify(body) });
+  loadFeedbacks();
+}
+
+function renderFeedbackDetail(f) {
+  const audio = f.audioBlobKey && !String(f.audioBlobKey).startsWith("pending:")
+    ? `<audio controls src="/api/v1/admin/feedbacks/${f.id}/audio?_=${state.token}" style="width:100%"></audio>` : "";
+  const shot = f.screenshotKey && !String(f.screenshotKey).startsWith("pending:")
+    ? `<img src="/api/v1/admin/feedbacks/${f.id}/screenshot" style="max-width:100%;border-radius:6px;border:1px solid var(--border)">` : "";
+  return `
+    <div class="grid">
+      <div><b>${esc(f.type)}</b> · ${new Date(f.createdAt).toLocaleString()}</div>
+      <pre>${esc(f.text || "(no text)")}</pre>
+      ${audio}
+      ${shot}
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <label>Status<select id="fbStatus">
+          <option value="new" ${f.status==="new"?"selected":""}>new</option>
+          <option value="triaged" ${f.status==="triaged"?"selected":""}>triaged</option>
+          <option value="resolved" ${f.status==="resolved"?"selected":""}>resolved</option>
+        </select></label>
+        <label>Priority<select id="fbPriority">
+          <option value="">—</option>
+          ${[1,2,3,4,5].map(n => `<option value="${n}" ${f.priority===n?"selected":""}>${n}</option>`).join("")}
+        </select></label>
+        <label>Category<select id="fbCategory">
+          <option value="">—</option>
+          ${["bug","idea","praise","question"].map(c => `<option value="${c}" ${f.category===c?"selected":""}>${c}</option>`).join("")}
+        </select></label>
+      </div>
+      <details><summary>Submitter / metadata / page</summary>
+        <pre>${esc(JSON.stringify({ submitter: f.submitter, customMetadata: f.customMetadata, pageUrl: f.pageUrl, userAgent: f.userAgent }, null, 2))}</pre>
+      </details>
+    </div>`;
+}
+
+let editProjectId = null;
+function openProjectDialog(p = null) {
+  editProjectId = p?.id || null;
+  $("#projectDialogTitle").textContent = p ? "Edit project" : "New project";
+  $("#projName").value = p?.name || "";
+  $("#projOrigins").value = (p?.allowedOrigins || []).join(",");
+  $("#projRetention").value = p?.retentionDays || "";
+  $("#projectDialog").showModal();
+}
+
+async function saveProject() {
+  const body = {
+    name: $("#projName").value.trim(),
+    allowedOrigins: $("#projOrigins").value.split(",").map(s => s.trim()).filter(Boolean),
+    retentionDays: $("#projRetention").value ? Number($("#projRetention").value) : null,
+  };
+  if (editProjectId) await api("/admin/projects/" + editProjectId, { method: "PATCH", body: JSON.stringify(body) });
+  else await api("/admin/projects", { method: "POST", body: JSON.stringify(body) });
+  $("#projectDialog").close();
+  await loadProjects();
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
+
+function render() { renderProjects(state.projects); }
+loadProjects();
+</script>
+</body>
+</html>

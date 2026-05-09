@@ -55,3 +55,48 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.userosscache
+*.sln.docstates
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# AMiracle.Echo runtime artifacts (local dev DBs, blob stores, smoke-test outputs)
+echo.db
+echo.db-*
+smoketest.db
+smoketest.db-*
+echo-blobs/
+smoketest-blobs/
+src/AMiracle.Echo.Host/echo.db
+src/AMiracle.Echo.Host/echo.db-*
+src/AMiracle.Echo.Host/smoketest.db
+src/AMiracle.Echo.Host/smoketest.db-*
+src/AMiracle.Echo.Host/echo-blobs/
+src/AMiracle.Echo.Host/smoketest-blobs/
+
+# Local secret overrides (don't commit admin tokens, connection strings, etc.)
+appsettings.local.json
+appsettings.*.local.json
+src/**/appsettings.local.json
+src/**/appsettings.*.local.json
+
+# User secrets are stored under %APPDATA% so they don't need ignoring, but in case anyone exports them:
+*.secrets.json
+
+# Logs
+*.log
+/tmp/
