@@ -19,4 +19,8 @@
     <EmbeddedResource Include="Resources\widget.js" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\AMiracle.Echo.Analysis.Abstractions\AMiracle.Echo.Analysis.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

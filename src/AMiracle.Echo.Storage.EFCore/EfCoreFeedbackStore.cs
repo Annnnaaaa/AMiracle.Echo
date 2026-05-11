@@ -89,6 +89,17 @@ public sealed class EfCoreFeedbackStore : IFeedbackStore
         if (query.Status is { Length: > 0 } s) q = q.Where(f => f.Status == s);
         if (query.Type is { Length: > 0 } t) q = q.Where(f => f.Type == t);
         if (query.Since is { } since) q = q.Where(f => f.CreatedAt >= since);
+        if (query.Until is { } until) q = q.Where(f => f.CreatedAt <= until);
+        if (query.Assignee is { Length: > 0 } a) q = q.Where(f => f.Assignee == a);
+        if (query.Category is { Length: > 0 } c) q = q.Where(f => f.Category == c);
+        if (query.Priority is { } pr) q = q.Where(f => f.Priority == pr);
+        if (query.SearchText is { Length: > 0 } st)
+        {
+            // Case-insensitive contains across text + summary. EF Like is portable.
+            var pat = "%" + st.Replace("%", "[%]").Replace("_", "[_]") + "%";
+            q = q.Where(f => EF.Functions.Like(f.Text ?? "", pat)
+                          || EF.Functions.Like(f.Summary ?? "", pat));
+        }
 
         if (TryDecodeCursor(query.Cursor, out var cursorTs, out var cursorId))
         {
@@ -119,6 +130,13 @@ public sealed class EfCoreFeedbackStore : IFeedbackStore
         entity.AudioBlobKey = feedback.AudioBlobKey;
         entity.ScreenshotKey = feedback.ScreenshotKey;
         entity.DeletedAt = feedback.DeletedAt;
+        // Phase 2.
+        entity.Summary = feedback.Summary;
+        entity.AnalysisVersion = feedback.AnalysisVersion;
+        entity.AnalyzedAt = feedback.AnalyzedAt;
+        entity.AnalysisError = feedback.AnalysisError;
+        // Phase 3.
+        entity.Assignee = feedback.Assignee;
         await _db.SaveChangesAsync(ct);
         return ToModel(entity);
     }
@@ -191,6 +209,11 @@ public sealed class EfCoreFeedbackStore : IFeedbackStore
         ConsentText = m.ConsentText,
         CreatedAt = m.CreatedAt,
         DeletedAt = m.DeletedAt,
+        Summary = m.Summary,
+        AnalysisVersion = m.AnalysisVersion,
+        AnalyzedAt = m.AnalyzedAt,
+        AnalysisError = m.AnalysisError,
+        Assignee = m.Assignee,
     };
 
     private static Feedback ToModel(FeedbackEntity e) => new()
@@ -213,6 +236,11 @@ public sealed class EfCoreFeedbackStore : IFeedbackStore
         ConsentText = e.ConsentText,
         CreatedAt = e.CreatedAt,
         DeletedAt = e.DeletedAt,
+        Summary = e.Summary,
+        AnalysisVersion = e.AnalysisVersion,
+        AnalyzedAt = e.AnalyzedAt,
+        AnalysisError = e.AnalysisError,
+        Assignee = e.Assignee,
     };
 
     private static ProjectEntity ToEntity(Project m) => new()
@@ -253,5 +281,89 @@ public sealed class EfCoreFeedbackStore : IFeedbackStore
             return true;
         }
         catch { return false; }
+    }
+
+    // ----- Phase 2: pending analysis queue -----
+
+    public async Task<IReadOnlyList<Feedback>> FindPendingAnalysisAsync(int currentVersion, int limit, CancellationToken ct = default)
+    {
+        var entities = await _db.Feedbacks.AsNoTracking()
+            .Where(f => f.AnalysisVersion < currentVersion
+                     && f.DeletedAt == null
+                     && f.AnalysisError == null)
+            .OrderBy(f => f.CreatedAt)
+            .Take(Math.Clamp(limit, 1, 200))
+            .ToListAsync(ct);
+        return entities.Select(ToModel).ToList();
+    }
+
+    // ----- Phase 3: comments -----
+
+    public async Task<FeedbackComment> AddCommentAsync(FeedbackComment comment, CancellationToken ct = default)
+    {
+        var entity = new FeedbackCommentEntity
+        {
+            Id = comment.Id == Guid.Empty ? Guid.NewGuid() : comment.Id,
+            FeedbackId = comment.FeedbackId,
+            Body = comment.Body,
+            Author = comment.Author,
+            CreatedAt = comment.CreatedAt == default ? DateTimeOffset.UtcNow : comment.CreatedAt,
+        };
+        _db.FeedbackComments.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        return new FeedbackComment
+        {
+            Id = entity.Id, FeedbackId = entity.FeedbackId,
+            Body = entity.Body, Author = entity.Author, CreatedAt = entity.CreatedAt,
+        };
+    }
+
+    public async Task<IReadOnlyList<FeedbackComment>> ListCommentsAsync(Guid feedbackId, CancellationToken ct = default)
+    {
+        var entities = await _db.FeedbackComments.AsNoTracking()
+            .Where(c => c.FeedbackId == feedbackId)
+            .OrderBy(c => c.CreatedAt)
+            .ToListAsync(ct);
+        return entities.Select(c => new FeedbackComment
+        {
+            Id = c.Id, FeedbackId = c.FeedbackId,
+            Body = c.Body, Author = c.Author, CreatedAt = c.CreatedAt,
+        }).ToList();
+    }
+
+    public async Task DeleteCommentAsync(Guid id, CancellationToken ct = default)
+    {
+        var entity = await _db.FeedbackComments.FirstOrDefaultAsync(c => c.Id == id, ct);
+        if (entity is null) return;
+        _db.FeedbackComments.Remove(entity);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    // ----- Phase 3: stats -----
+
+    public async Task<FeedbackStats> GetStatsAsync(Guid? projectId, DateTimeOffset? since, CancellationToken ct = default)
+    {
+        var q = _db.Feedbacks.AsNoTracking().Where(f => f.DeletedAt == null);
+        if (projectId is { } pid) q = q.Where(f => f.ProjectId == pid);
+        var sinceCutoff = since ?? DateTimeOffset.UtcNow.AddDays(-30);
+        var qRecent = q.Where(f => f.CreatedAt >= sinceCutoff);
+
+        // Pull lightweight projections; group in memory to avoid provider quirks.
+        var rows = await q
+            .Select(f => new { f.Status, f.Type, f.Category, f.Priority, f.CreatedAt })
+            .ToListAsync(ct);
+
+        int total = rows.Count;
+        var byStatus = rows.GroupBy(r => r.Status ?? "").ToDictionary(g => g.Key, g => g.Count());
+        var byType = rows.GroupBy(r => r.Type ?? "").ToDictionary(g => g.Key, g => g.Count());
+        var byCategory = rows.GroupBy(r => r.Category ?? "uncategorized").ToDictionary(g => g.Key, g => g.Count());
+        var byPriority = rows.GroupBy(r => r.Priority?.ToString() ?? "unset").ToDictionary(g => g.Key, g => g.Count());
+
+        var byDay = rows
+            .Where(r => r.CreatedAt >= sinceCutoff)
+            .GroupBy(r => r.CreatedAt.UtcDateTime.Date.ToString("yyyy-MM-dd"))
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return new FeedbackStats(total, byStatus, byType, byCategory, byPriority, byDay);
     }
 }

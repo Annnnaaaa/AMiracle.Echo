@@ -23,6 +23,17 @@ public interface IFeedbackStore
     // Retention sweep helpers
     Task<IReadOnlyList<Feedback>> FindExpiredAsync(DateTimeOffset now, CancellationToken ct = default);
     Task<IReadOnlyList<Feedback>> FindAbandonedAsync(DateTimeOffset cutoff, CancellationToken ct = default);
+
+    // Phase 2 — analysis queue.
+    Task<IReadOnlyList<Feedback>> FindPendingAnalysisAsync(int currentVersion, int limit, CancellationToken ct = default);
+
+    // Phase 3 — comments.
+    Task<FeedbackComment> AddCommentAsync(FeedbackComment comment, CancellationToken ct = default);
+    Task<IReadOnlyList<FeedbackComment>> ListCommentsAsync(Guid feedbackId, CancellationToken ct = default);
+    Task DeleteCommentAsync(Guid id, CancellationToken ct = default);
+
+    // Phase 3 — stats.
+    Task<FeedbackStats> GetStatsAsync(Guid? projectId, DateTimeOffset? since, CancellationToken ct = default);
 }
 
 public sealed record FeedbackQuery(
@@ -31,6 +42,20 @@ public sealed record FeedbackQuery(
     string? Type = null,
     DateTimeOffset? Since = null,
     string? Cursor = null,
-    int Limit = 50);
+    int Limit = 50,
+    // Phase 3 filters.
+    string? SearchText = null,
+    string? Assignee = null,
+    string? Category = null,
+    short? Priority = null,
+    DateTimeOffset? Until = null);
 
 public sealed record FeedbackPage(IReadOnlyList<Feedback> Items, string? NextCursor);
+
+public sealed record FeedbackStats(
+    int Total,
+    Dictionary<string, int> ByStatus,
+    Dictionary<string, int> ByType,
+    Dictionary<string, int> ByCategory,
+    Dictionary<string, int> ByPriority,
+    Dictionary<string, int> ByDay);   // "yyyy-MM-dd" → count, last 30 days.

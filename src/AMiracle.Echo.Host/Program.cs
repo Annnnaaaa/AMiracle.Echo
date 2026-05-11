@@ -1,3 +1,4 @@
+using AMiracle.Echo.Analysis.OpenAI;
 using AMiracle.Echo.Server;
 using AMiracle.Echo.Storage.EFCore;
 using AMiracle.Echo.Storage.LocalFS;
@@ -33,6 +34,14 @@ builder.Services.AddEchoEfCoreStorage(opts =>
 // Local filesystem blob store.
 var blobRoot = builder.Configuration["AMiracle:Echo:BlobStore:RootPath"] ?? "./echo-blobs";
 builder.Services.AddEchoLocalFileBlobStore(opts => opts.RootPath = blobRoot);
+
+// Phase 2 — optional OpenAI analyzer. Only registered if Analysis.Enabled=true AND ApiKey set.
+var analysisEnabled = builder.Configuration.GetValue<bool>("AMiracle:Echo:Analysis:Enabled");
+var openAIKey = builder.Configuration["AMiracle:Echo:Analysis:OpenAI:ApiKey"];
+if (analysisEnabled && !string.IsNullOrWhiteSpace(openAIKey))
+{
+    builder.Services.AddEchoOpenAIAnalyzer(builder.Configuration.GetSection("AMiracle:Echo:Analysis:OpenAI"));
+}
 
 var app = builder.Build();
 

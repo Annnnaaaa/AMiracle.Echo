@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AMiracle.Echo.Abstractions\AMiracle.Echo.Abstractions.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <PackageId>AMiracle.Echo.Analysis.Abstractions</PackageId>
+    <Description>Interfaces for pluggable feedback analysis (transcription, summary, categorization, priority).</Description>
+  </PropertyGroup>
+
+</Project>

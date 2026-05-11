@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AMiracle.Echo — Admin</title>
 <style>
-  :root { --bg:#fff; --fg:#1a1a1a; --muted:#6b7280; --border:#e5e7eb; --primary:#4f46e5; --row-hover:#f9fafb; --card:#fafafa; --error-bg:#fee2e2; --error-fg:#991b1b; --info-bg:#dbeafe; --info-fg:#1e3a8a; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f0f12; --fg:#f4f4f5; --muted:#9ca3af; --border:#27272a; --row-hover:#18181b; --card:#18181b; --error-bg:#7f1d1d; --error-fg:#fecaca; --info-bg:#1e3a8a; --info-fg:#dbeafe; } }
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#6b7280; --border:#e5e7eb; --primary:#4f46e5; --row-hover:#f9fafb; --card:#fafafa; --error-bg:#fee2e2; --error-fg:#991b1b; --info-bg:#dbeafe; --info-fg:#1e3a8a; --chip:#f3f4f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f0f12; --fg:#f4f4f5; --muted:#9ca3af; --border:#27272a; --row-hover:#18181b; --card:#18181b; --error-bg:#7f1d1d; --error-fg:#fecaca; --info-bg:#1e3a8a; --info-fg:#dbeafe; --chip:#27272a; } }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background: var(--bg); color: var(--fg); }
   header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -37,19 +37,23 @@
   .pill.new { background: #dbeafe; color: #1e40af; border: 0; }
   .pill.triaged { background: #fde68a; color: #78350f; border: 0; }
   .pill.resolved { background: #d1fae5; color: #064e3b; border: 0; }
+  .pill.priority-5 { background: #fecaca; color: #7f1d1d; border: 0; }
+  .pill.priority-4 { background: #fed7aa; color: #9a3412; border: 0; }
+  .pill.priority-3 { background: #fef3c7; color: #92400e; border: 0; }
+  .pill.priority-1, .pill.priority-2 { background: var(--chip); color: var(--muted); border: 0; }
   .grid { display: grid; gap: 8px; }
   details { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
-  pre { white-space: pre-wrap; word-break: break-word; background: var(--row-hover); padding: 10px; border-radius: 6px; }
+  pre { white-space: pre-wrap; word-break: break-word; background: var(--row-hover); padding: 10px; border-radius: 6px; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .toolbar .grow { flex: 1; min-width: 200px; }
   .empty { color: var(--muted); padding: 40px; text-align: center; }
-  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 20px; background: var(--bg); color: var(--fg); width: min(440px, 92vw); }
+  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 20px; background: var(--bg); color: var(--fg); width: min(560px, 92vw); max-height: 92vh; overflow: auto; }
   dialog::backdrop { background: rgba(0,0,0,.4); }
   label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .field { margin-bottom: 12px; }
   .field input, .field textarea { width: 100%; }
   .help-text { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
-  /* Project detail card */
   .pcard { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
   .pcard h2 { margin: 0 0 4px 0; font-size: 18px; font-weight: 600; }
   .pcard .archived-pill { display:inline-block; background:#fef3c7; color:#92400e; font-size:11px; padding:2px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
@@ -60,16 +64,39 @@
   .pcard .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
   .pcard button { font-size: 13px; padding: 5px 10px; }
 
-  /* Error/info toasts */
   .banner { padding: 10px 14px; border-radius: 8px; margin: 0 16px 12px 16px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
   .banner.error { background: var(--error-bg); color: var(--error-fg); }
   .banner.info { background: var(--info-bg); color: var(--info-fg); }
   .banner button { background: transparent; border: 0; color: inherit; cursor: pointer; font-weight: bold; opacity: .7; }
-  .banner code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
 
-  /* Inline dialog error */
   .dialog-error { color: #b91c1c; font-size: 13px; margin-bottom: 8px; }
   @media (prefers-color-scheme: dark) { .dialog-error { color: #fca5a5; } }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .tab { padding: 8px 14px; cursor: pointer; border: 0; background: transparent; color: var(--muted); border-bottom: 2px solid transparent; font-size: 14px; }
+  .tab.active { color: var(--fg); border-bottom-color: var(--primary); font-weight: 600; }
+
+  /* Stat cards */
+  .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .stat-card .label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .stat-card .val { font-size: 28px; font-weight: 600; }
+  .chart { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+  .chart h3 { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 13px; }
+  .bar { background: var(--primary); height: 18px; border-radius: 3px; min-width: 2px; }
+  .bar.cat-bug { background: #ef4444; } .bar.cat-idea { background: #3b82f6; } .bar.cat-praise { background: #10b981; } .bar.cat-question { background: #f59e0b; }
+
+  /* Comments */
+  .comment { background: var(--row-hover); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 13px; }
+  .comment .meta { color: var(--muted); font-size: 11px; margin-bottom: 2px; display:flex; justify-content:space-between; }
+  .comment-add { display: grid; grid-template-columns: 130px 1fr auto; gap: 6px; margin-top: 8px; }
+
+  /* Analysis pills */
+  .analysis-bar { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .analysis-bar .ok { color: #10b981; }
+  .analysis-bar .err { color: #b91c1c; }
 </style>
 </head>
 <body>
@@ -124,16 +151,23 @@
   <h3>Feedback</h3>
   <div id="feedbackBody"></div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+    <button class="ghost"  id="fbReanalyze">Re-analyze</button>
     <button class="danger" id="fbDelete">Delete</button>
-    <button class="ghost" id="fbClose">Close</button>
+    <button class="ghost"  id="fbClose">Close</button>
   </div>
 </dialog>
 
 <script>
 const $ = s => document.querySelector(s);
-const state = { token: localStorage.getItem("echoToken") || "", projects: [], activeProject: null, feedbacks: [] };
+const state = {
+  token: localStorage.getItem("echoToken") || "",
+  projects: [], activeProject: null,
+  activeTab: "feedbacks",
+  feedbacks: [], feedbackFilters: {},
+  currentFeedbackId: null, comments: [],
+};
 
-// ===== Banner / error surfacing =====
+// ===== Toast =====
 function showBanner(type, html, autoHide = false) {
   const b = $("#banner");
   b.className = "banner " + type;
@@ -144,9 +178,9 @@ function showBanner(type, html, autoHide = false) {
 }
 function hideBanner() { $("#banner").hidden = true; }
 function showError(msg) { showBanner("error", "<strong>Error:</strong> " + esc(msg)); }
-function showInfo(msg) { showBanner("info", esc(msg), true); }
+function showInfo(msg)  { showBanner("info", esc(msg), true); }
 
-// ===== API wrapper =====
+// ===== API =====
 async function api(path, opts = {}) {
   if (!state.token) throw new Error("No admin token set. Paste it above and click Save.");
   opts.headers = Object.assign({ "Authorization": "Bearer " + state.token, "Content-Type": "application/json" }, opts.headers || {});
@@ -169,7 +203,7 @@ async function api(path, opts = {}) {
   return r.status === 204 ? null : r.json();
 }
 
-// ===== Header wiring =====
+// ===== Header =====
 $("#token").value = state.token;
 $("#saveToken").onclick = async () => {
   state.token = $("#token").value.trim();
@@ -179,9 +213,7 @@ $("#saveToken").onclick = async () => {
   await loadProjects(true);
 };
 $("#logout").onclick = () => {
-  state.token = "";
-  localStorage.removeItem("echoToken");
-  $("#token").value = "";
+  state.token = ""; localStorage.removeItem("echoToken"); $("#token").value = "";
   state.projects = []; state.activeProject = null;
   renderProjects([]); renderRoot();
   hideBanner();
@@ -193,26 +225,20 @@ $("#newProject").onclick = () => {
 $("#projCancel").onclick = () => $("#projectDialog").close();
 $("#projSave").onclick = saveProject;
 $("#fbClose").onclick = () => $("#feedbackDialog").close();
+$("#fbReanalyze").onclick = reanalyzeActive;
 
 // ===== Projects =====
 async function loadProjects(announceSuccess = false) {
   if (!state.token) { renderProjects([]); renderRoot(); return; }
-  try {
-    state.projects = await api("/admin/projects");
-  } catch (e) {
-    showError(e.message);
-    renderProjects([]); renderRoot();
-    return;
-  }
+  try { state.projects = await api("/admin/projects"); }
+  catch (e) { showError(e.message); renderProjects([]); renderRoot(); return; }
   renderProjects(state.projects);
-  if (announceSuccess && state.projects.length === 0) {
+  if (announceSuccess && state.projects.length === 0)
     showInfo("Connected. No projects yet — click ‘+ New’ in the sidebar to create one.");
-  }
   if (state.projects.length) {
     if (!state.activeProject || !state.projects.find(p => p.id === state.activeProject.id)) {
       selectProject(state.projects[0]);
     } else {
-      // Refresh the active project's data after edits/rotate-key.
       state.activeProject = state.projects.find(p => p.id === state.activeProject.id);
       renderRoot();
     }
@@ -223,15 +249,9 @@ async function loadProjects(announceSuccess = false) {
 
 function renderProjects(list) {
   const root = $("#projects");
+  if (!state.token) { root.innerHTML = `<div class="help-text">Sign in with admin token to load projects.</div>`; return; }
+  if (!list.length) { root.innerHTML = `<div class="help-text">No projects yet.</div>`; return; }
   root.innerHTML = "";
-  if (!state.token) {
-    root.innerHTML = `<div class="help-text">Sign in with admin token to load projects.</div>`;
-    return;
-  }
-  if (!list.length) {
-    root.innerHTML = `<div class="help-text">No projects yet.</div>`;
-    return;
-  }
   for (const p of list) {
     const div = document.createElement("div");
     div.className = "project" + (state.activeProject?.id === p.id ? " active" : "") + (p.archivedAt ? " archived" : "");
@@ -243,12 +263,15 @@ function renderProjects(list) {
 
 function selectProject(p) {
   state.activeProject = p;
+  state.feedbacks = [];
+  state.feedbackFilters = {};
   renderProjects(state.projects);
   renderRoot();
-  loadFeedbacks();
+  if (state.activeTab === "feedbacks") loadFeedbacks();
+  else if (state.activeTab === "stats") loadStats();
 }
 
-// ===== Main section render =====
+// ===== Main render =====
 function renderRoot() {
   const section = $("#mainSection");
   if (!state.token) {
@@ -283,20 +306,13 @@ function renderRoot() {
       </div>
     </div>
 
-    <div class="toolbar">
-      <h3 style="margin:0 8px 0 0">Feedback</h3>
-      <select id="filterStatus">
-        <option value="">All statuses</option><option value="new">new</option><option value="triaged">triaged</option><option value="resolved">resolved</option>
-      </select>
-      <select id="filterType">
-        <option value="">All types</option><option value="text">text</option><option value="voice">voice</option>
-      </select>
-      <button class="ghost" id="refresh">Refresh</button>
+    <div class="tabs">
+      <button class="tab ${state.activeTab==="feedbacks"?"active":""}" data-tab="feedbacks">Feedback</button>
+      <button class="tab ${state.activeTab==="stats"?"active":""}" data-tab="stats">Stats</button>
     </div>
-    <div id="feedbacksContainer"><div class="empty">Loading…</div></div>
+    <div id="tabContent"></div>
   `;
 
-  // Project card actions.
   section.querySelector('[data-act="copy-key"]')?.addEventListener("click", () => {
     navigator.clipboard.writeText(p.publicKey); showInfo("Public key copied.");
   });
@@ -305,10 +321,10 @@ function renderRoot() {
   section.querySelector('[data-act="archive"]')?.addEventListener("click", toggleArchiveActive);
   section.querySelector('[data-act="delete"]')?.addEventListener("click", deleteActiveProject);
   section.querySelector('[data-act="snippet"]')?.addEventListener("click", showSnippet);
+  section.querySelectorAll(".tab").forEach(t => t.onclick = () => { state.activeTab = t.dataset.tab; renderRoot(); state.activeTab === "stats" ? loadStats() : loadFeedbacks(); });
 
-  $("#refresh").onclick = () => loadFeedbacks();
-  $("#filterStatus").onchange = () => loadFeedbacks();
-  $("#filterType").onchange = () => loadFeedbacks();
+  if (state.activeTab === "feedbacks") renderFeedbacksTab();
+  else if (state.activeTab === "stats") renderStatsTab();
 }
 
 async function rotateActiveKey() {
@@ -319,7 +335,6 @@ async function rotateActiveKey() {
     await loadProjects();
   } catch (e) { showError(e.message); }
 }
-
 async function toggleArchiveActive() {
   const p = state.activeProject;
   try {
@@ -327,7 +342,6 @@ async function toggleArchiveActive() {
     await loadProjects();
   } catch (e) { showError(e.message); }
 }
-
 async function deleteActiveProject() {
   const p = state.activeProject;
   if (!confirm(`Delete project "${p.name}"? This permanently removes the project AND all its feedbacks and blob attachments. Cannot be undone.`)) return;
@@ -339,12 +353,11 @@ async function deleteActiveProject() {
     await loadProjects();
   } catch (e) { showError(e.message); }
 }
-
 function showSnippet() {
   const p = state.activeProject;
   const url = location.origin + "/echo/widget.js";
   showBanner("info", `
-    <div>Drop this on your page (after replacing origins as needed):</div>
+    <div>Drop this on your page (replace allowed origins as needed):</div>
     <pre style="margin:8px 0 0 0">&lt;script src="${url}"
         data-project-id="${esc(p.id)}"
         data-public-key="${esc(p.publicKey)}"
@@ -352,57 +365,210 @@ function showSnippet() {
   `);
 }
 
-// ===== Feedbacks =====
-async function loadFeedbacks() {
-  if (!state.activeProject) return;
-  const params = new URLSearchParams({ projectId: state.activeProject.id, limit: "100" });
-  const fs = $("#filterStatus"); if (fs?.value) params.set("status", fs.value);
-  const ft = $("#filterType"); if (ft?.value) params.set("type", ft.value);
-  try {
-    const page = await api("/admin/feedbacks?" + params.toString());
-    state.feedbacks = page.items || [];
-    renderFeedbacks();
-  } catch (e) {
-    showError(e.message);
-  }
+// ===== Feedbacks tab =====
+function renderFeedbacksTab() {
+  const root = $("#tabContent");
+  const f = state.feedbackFilters;
+  root.innerHTML = `
+    <div class="toolbar">
+      <input class="grow" id="filterSearch" placeholder="Search text / summary…" value="${esc(f.search||"")}">
+      <select id="filterStatus">
+        <option value="">Any status</option>
+        ${["new","triaged","resolved"].map(s => `<option value="${s}" ${f.status===s?"selected":""}>${s}</option>`).join("")}
+      </select>
+      <select id="filterType">
+        <option value="">Any type</option>
+        ${["text","voice"].map(s => `<option value="${s}" ${f.type===s?"selected":""}>${s}</option>`).join("")}
+      </select>
+      <select id="filterCategory">
+        <option value="">Any category</option>
+        ${["bug","idea","praise","question"].map(s => `<option value="${s}" ${f.category===s?"selected":""}>${s}</option>`).join("")}
+      </select>
+      <select id="filterPriority">
+        <option value="">Any priority</option>
+        ${[1,2,3,4,5].map(n => `<option value="${n}" ${f.priority==n?"selected":""}>${n}</option>`).join("")}
+      </select>
+      <input id="filterAssignee" placeholder="Assignee" style="width:140px" value="${esc(f.assignee||"")}">
+      <input id="filterSince" type="date" title="From date" value="${f.since||""}">
+      <input id="filterUntil" type="date" title="To date"   value="${f.until||""}">
+      <button class="ghost" id="refresh">Refresh</button>
+      <button class="primary" id="export">⬇ CSV</button>
+    </div>
+    <div id="feedbacksContainer"><div class="empty">Loading…</div></div>
+  `;
+  const apply = () => {
+    state.feedbackFilters = {
+      search: $("#filterSearch").value.trim(),
+      status: $("#filterStatus").value,
+      type: $("#filterType").value,
+      category: $("#filterCategory").value,
+      priority: $("#filterPriority").value,
+      assignee: $("#filterAssignee").value.trim(),
+      since: $("#filterSince").value,
+      until: $("#filterUntil").value,
+    };
+    loadFeedbacks();
+  };
+  $("#refresh").onclick = apply;
+  $("#export").onclick = exportCsv;
+  ["filterStatus","filterType","filterCategory","filterPriority","filterSince","filterUntil"].forEach(id =>
+    $("#"+id).addEventListener("change", apply));
+  let dt;
+  ["filterSearch","filterAssignee"].forEach(id =>
+    $("#"+id).addEventListener("input", () => { clearTimeout(dt); dt = setTimeout(apply, 350); }));
 }
 
-function renderFeedbacks() {
-  const root = $("#feedbacksContainer");
-  if (!root) return;
-  if (!state.feedbacks.length) { root.innerHTML = `<div class="empty">No feedback yet for this project.</div>`; return; }
-  const rows = state.feedbacks.map(f => `
-    <tr class="row" data-id="${f.id}">
+function buildFeedbackParams() {
+  const f = state.feedbackFilters;
+  const p = new URLSearchParams({ projectId: state.activeProject.id, limit: "100" });
+  if (f.status) p.set("status", f.status);
+  if (f.type) p.set("type", f.type);
+  if (f.category) p.set("category", f.category);
+  if (f.priority) p.set("priority", f.priority);
+  if (f.assignee) p.set("assignee", f.assignee);
+  if (f.search) p.set("search", f.search);
+  if (f.since) p.set("since", new Date(f.since + "T00:00:00Z").toISOString());
+  if (f.until) p.set("until", new Date(f.until + "T23:59:59Z").toISOString());
+  return p;
+}
+
+async function loadFeedbacks() {
+  if (!state.activeProject || state.activeTab !== "feedbacks") return;
+  try {
+    const page = await api("/admin/feedbacks?" + buildFeedbackParams().toString());
+    state.feedbacks = page.items || [];
+    renderFeedbacksTable();
+  } catch (e) { showError(e.message); }
+}
+
+function renderFeedbacksTable() {
+  const root = $("#feedbacksContainer"); if (!root) return;
+  if (!state.feedbacks.length) { root.innerHTML = `<div class="empty">No feedback matches the current filters.</div>`; return; }
+  const rows = state.feedbacks.map(f => {
+    const preview = f.summary || f.text || "";
+    const previewShort = esc(preview.slice(0, 100)) + (preview.length > 100 ? "…" : "");
+    const priPill = f.priority ? `<span class="pill priority-${f.priority}">P${f.priority}</span>` : "";
+    return `<tr class="row" data-id="${f.id}">
       <td>${new Date(f.createdAt).toLocaleString()}</td>
-      <td>${f.type}</td>
-      <td>${esc((f.text || "").slice(0, 80))}${f.text && f.text.length > 80 ? "…" : ""}</td>
+      <td>${f.type}${f.type==='voice'&&f.audioBlobKey&&!String(f.audioBlobKey).startsWith('pending:') ? ' 🎤':''}${f.screenshotKey&&!String(f.screenshotKey).startsWith('pending:') ? ' 📎':''}</td>
+      <td>${previewShort}${f.summary?'<div class="help-text" style="font-style:italic">summary by AI</div>':''}</td>
       <td><span class="pill ${f.status}">${f.status}</span></td>
-      <td>${f.priority ?? ""}</td>
+      <td>${priPill}</td>
       <td>${f.category ?? ""}</td>
-    </tr>`).join("");
+      <td>${esc(f.assignee || "")}</td>
+    </tr>`;
+  }).join("");
   root.innerHTML = `<table>
-    <thead><tr><th>When</th><th>Type</th><th>Text</th><th>Status</th><th>Pri</th><th>Cat</th></tr></thead>
+    <thead><tr><th>When</th><th>Type</th><th>Text / Summary</th><th>Status</th><th>Priority</th><th>Category</th><th>Assignee</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
   root.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => openFeedback(tr.dataset.id));
 }
 
+async function exportCsv() {
+  if (!state.activeProject) return;
+  const params = buildFeedbackParams();
+  params.delete("limit");
+  const url = "/api/v1/admin/feedbacks/export?" + params.toString();
+  try {
+    const r = await fetch(url, { headers: { "Authorization": "Bearer " + state.token } });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `feedbacks-${state.activeProject.name.replace(/[^a-z0-9]+/gi,"-")}-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    showInfo("Export downloaded.");
+  } catch (e) { showError("CSV export failed: " + e.message); }
+}
+
+// ===== Stats tab =====
+async function loadStats() {
+  if (!state.activeProject) return;
+  const root = $("#tabContent");
+  root.innerHTML = `<div class="empty">Loading stats…</div>`;
+  try {
+    const stats = await api("/admin/stats?projectId=" + state.activeProject.id);
+    renderStats(stats);
+  } catch (e) { showError(e.message); }
+}
+function renderStatsTab() {
+  const root = $("#tabContent");
+  root.innerHTML = `<div class="empty">Loading stats…</div>`;
+  loadStats();
+}
+function renderStats(s) {
+  const root = $("#tabContent");
+  const cards = (label, val, sub="") =>
+    `<div class="stat-card"><div class="label">${esc(label)}</div><div class="val">${val}</div>${sub?`<div class="help-text">${esc(sub)}</div>`:""}</div>`;
+  const newCount = s.byStatus?.new || 0;
+  const resolvedCount = s.byStatus?.resolved || 0;
+  const triagedCount = s.byStatus?.triaged || 0;
+  const voiceCount = s.byType?.voice || 0;
+  root.innerHTML = `
+    <div class="stat-cards">
+      ${cards("Total", s.total)}
+      ${cards("New", newCount)}
+      ${cards("Triaged", triagedCount)}
+      ${cards("Resolved", resolvedCount)}
+      ${cards("Voice", voiceCount)}
+    </div>
+    ${bars("By category", s.byCategory, "cat-")}
+    ${bars("By priority (1=trivial → 5=critical)", s.byPriority)}
+    ${bars("By status", s.byStatus)}
+    ${bars("By type", s.byType)}
+    ${timeChart("Last 30 days", s.byDay)}
+  `;
+}
+function bars(title, dict, prefix="") {
+  const entries = Object.entries(dict || {});
+  if (!entries.length) return "";
+  const max = Math.max(1, ...entries.map(([_,v]) => v));
+  return `<div class="chart"><h3>${esc(title)}</h3>` +
+    entries.sort((a,b) => b[1]-a[1]).map(([k,v]) =>
+      `<div class="bar-row"><div>${esc(k)}</div><div class="bar ${prefix+k}" style="width:${(v/max*100).toFixed(1)}%"></div><div>${v}</div></div>`
+    ).join("") + `</div>`;
+}
+function timeChart(title, dict) {
+  const today = new Date(); today.setUTCHours(0,0,0,0);
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today); d.setUTCDate(d.getUTCDate() - i);
+    days.push(d.toISOString().slice(0,10));
+  }
+  const max = Math.max(1, ...Object.values(dict || {}));
+  const bars = days.map(d => {
+    const v = dict?.[d] || 0;
+    const pct = (v / max) * 100;
+    return `<div style="display:inline-block;width:3.1%;text-align:center;vertical-align:bottom" title="${d}: ${v}">
+      <div style="background:var(--primary);height:${Math.max(2, pct).toFixed(1)}px;margin:0 1px;border-radius:2px 2px 0 0;width:100%;"></div>
+      <div style="font-size:9px;color:var(--muted)">${d.slice(8,10)}</div>
+    </div>`;
+  }).join("");
+  return `<div class="chart"><h3>${esc(title)}</h3><div style="height:80px;white-space:nowrap;display:flex;align-items:flex-end;">${bars}</div></div>`;
+}
+
+// ===== Feedback detail =====
 async function openFeedback(id) {
+  state.currentFeedbackId = id;
   try {
     const fb = await api("/admin/feedbacks/" + id);
-    $("#feedbackBody").innerHTML = renderFeedbackDetail(fb);
+    state.comments = await api(`/admin/feedbacks/${id}/comments`);
+    $("#feedbackBody").innerHTML = renderFeedbackDetail(fb, state.comments);
     $("#fbDelete").onclick = async () => {
       if (!confirm("Permanently delete this feedback?")) return;
-      try {
-        await api("/admin/feedbacks/" + id, { method: "DELETE" });
-        $("#feedbackDialog").close();
-        loadFeedbacks();
-      } catch (e) { showError(e.message); }
+      try { await api("/admin/feedbacks/" + id, { method: "DELETE" }); $("#feedbackDialog").close(); loadFeedbacks(); }
+      catch (e) { showError(e.message); }
     };
     $("#feedbackDialog").showModal();
     $("#fbStatus")?.addEventListener("change", e => patchFb(id, { status: e.target.value }));
     $("#fbPriority")?.addEventListener("change", e => patchFb(id, { priority: e.target.value ? Number(e.target.value) : null }));
     $("#fbCategory")?.addEventListener("change", e => patchFb(id, { category: e.target.value || null }));
+    let assDt;
+    $("#fbAssignee")?.addEventListener("input", e => { clearTimeout(assDt); assDt = setTimeout(() => patchFb(id, { assignee: e.target.value }), 600); });
+    $("#fbAddComment")?.addEventListener("click", () => addComment(id));
+    document.querySelectorAll(".comment [data-del-comment]").forEach(b =>
+      b.addEventListener("click", () => deleteComment(id, b.dataset.delComment)));
   } catch (e) { showError(e.message); }
 }
 
@@ -411,22 +577,85 @@ async function patchFb(id, body) {
   catch (e) { showError(e.message); }
 }
 
-function renderFeedbackDetail(f) {
+async function reanalyzeActive() {
+  if (!state.currentFeedbackId) return;
+  try {
+    await api(`/admin/feedbacks/${state.currentFeedbackId}/reanalyze`, { method: "POST" });
+    showInfo("Queued for re-analysis. If analysis is enabled on the server, it will run within the poll interval (default 30s).");
+    // Reload to refresh the analysis bar state.
+    setTimeout(() => openFeedback(state.currentFeedbackId), 600);
+  } catch (e) { showError(e.message); }
+}
+
+async function addComment(id) {
+  const author = $("#commentAuthor").value.trim();
+  const body = $("#commentBody").value.trim();
+  if (!author || !body) { showError("Author and comment body are required."); return; }
+  try {
+    await api(`/admin/feedbacks/${id}/comments`, { method: "POST", body: JSON.stringify({ author, body }) });
+    $("#commentBody").value = "";
+    state.comments = await api(`/admin/feedbacks/${id}/comments`);
+    $("#commentsList").innerHTML = renderComments(state.comments, id);
+    rebindCommentDelete(id);
+  } catch (e) { showError(e.message); }
+}
+async function deleteComment(feedbackId, commentId) {
+  if (!confirm("Delete this comment?")) return;
+  try {
+    await api(`/admin/feedbacks/${feedbackId}/comments/${commentId}`, { method: "DELETE" });
+    state.comments = await api(`/admin/feedbacks/${feedbackId}/comments`);
+    $("#commentsList").innerHTML = renderComments(state.comments, feedbackId);
+    rebindCommentDelete(feedbackId);
+  } catch (e) { showError(e.message); }
+}
+function rebindCommentDelete(feedbackId) {
+  document.querySelectorAll(".comment [data-del-comment]").forEach(b =>
+    b.addEventListener("click", () => deleteComment(feedbackId, b.dataset.delComment)));
+}
+
+function renderComments(list, id) {
+  if (!list.length) return `<div class="help-text">No comments yet.</div>`;
+  return list.map(c => `
+    <div class="comment">
+      <div class="meta"><span>${esc(c.author)} · ${new Date(c.createdAt).toLocaleString()}</span><button class="ghost" data-del-comment="${c.id}" title="Delete comment">✕</button></div>
+      <div>${esc(c.body)}</div>
+    </div>`).join("");
+}
+
+function renderFeedbackDetail(f, comments) {
   const audio = f.audioBlobKey && !String(f.audioBlobKey).startsWith("pending:")
-    ? `<audio controls src="/api/v1/admin/feedbacks/${f.id}/audio?_=${state.token}" style="width:100%"></audio>` : "";
+    ? `<audio controls preload="metadata" src="/api/v1/admin/feedbacks/${f.id}/audio" style="width:100%"></audio>` : "";
   const shot = f.screenshotKey && !String(f.screenshotKey).startsWith("pending:")
     ? `<img src="/api/v1/admin/feedbacks/${f.id}/screenshot" style="max-width:100%;border-radius:6px;border:1px solid var(--border)">` : "";
+
+  // Analysis status pill
+  let analysisBar = "";
+  if (f.analysisVersion > 0) {
+    analysisBar = `<div class="analysis-bar"><span class="ok">✓ Analyzed</span> v${f.analysisVersion} on ${new Date(f.analyzedAt).toLocaleString()}</div>`;
+  } else if (f.analysisError) {
+    analysisBar = `<div class="analysis-bar"><span class="err">⚠ Analysis failed:</span> ${esc(f.analysisError)}</div>`;
+  } else {
+    analysisBar = `<div class="analysis-bar">⏳ Pending analysis (or analysis is disabled on the server)</div>`;
+  }
+
   return `
     <div class="grid">
+      ${analysisBar}
       <div><b>${esc(f.type)}</b> · ${new Date(f.createdAt).toLocaleString()}</div>
-      <pre>${esc(f.text || "(no text)")}</pre>
+
+      ${f.summary ? `<div class="chart" style="margin:0"><h3 style="margin:0 0 4px 0">Summary</h3><div>${esc(f.summary)}</div></div>` : ""}
+
+      <details ${f.summary ? "" : "open"}>
+        <summary>${f.type === "voice" ? "Transcript / typed text" : "Text"}</summary>
+        <pre>${esc(f.text || "(none)")}</pre>
+      </details>
+
       ${audio}
       ${shot}
+
       <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:8px">
         <label>Status<select id="fbStatus">
-          <option value="new" ${f.status==="new"?"selected":""}>new</option>
-          <option value="triaged" ${f.status==="triaged"?"selected":""}>triaged</option>
-          <option value="resolved" ${f.status==="resolved"?"selected":""}>resolved</option>
+          ${["new","triaged","resolved"].map(s => `<option value="${s}" ${f.status===s?"selected":""}>${s}</option>`).join("")}
         </select></label>
         <label>Priority<select id="fbPriority">
           <option value="">—</option>
@@ -437,8 +666,25 @@ function renderFeedbackDetail(f) {
           ${["bug","idea","praise","question"].map(c => `<option value="${c}" ${f.category===c?"selected":""}>${c}</option>`).join("")}
         </select></label>
       </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label>Assignee</label>
+        <input id="fbAssignee" placeholder="e.g. @aram or anyone" value="${esc(f.assignee || "")}">
+        <div class="help-text">Free-form. Saved as you type (debounced).</div>
+      </div>
+
+      <div>
+        <h3 style="margin:8px 0 4px 0;font-size:14px">Comments (${comments.length})</h3>
+        <div id="commentsList">${renderComments(comments, f.id)}</div>
+        <div class="comment-add">
+          <input id="commentAuthor" placeholder="Your name">
+          <input id="commentBody" placeholder="Add a comment…">
+          <button class="primary" id="fbAddComment">Add</button>
+        </div>
+      </div>
+
       <details><summary>Submitter / metadata / page</summary>
-        <pre>${esc(JSON.stringify({ submitter: f.submitter, customMetadata: f.customMetadata, pageUrl: f.pageUrl, userAgent: f.userAgent }, null, 2))}</pre>
+        <pre>${esc(JSON.stringify({ submitter: f.submitter, customMetadata: f.customMetadata, pageUrl: f.pageUrl, userAgent: f.userAgent, consentText: f.consentText }, null, 2))}</pre>
       </details>
     </div>`;
 }
@@ -463,13 +709,11 @@ async function saveProject() {
   const name = $("#projName").value.trim();
   if (!name) { err.hidden = false; err.textContent = "Name is required."; return; }
   if (!state.token) { err.hidden = false; err.textContent = "No admin token set. Cancel and set the token first."; return; }
-
   const body = {
     name,
     allowedOrigins: $("#projOrigins").value.split(",").map(s => s.trim()).filter(Boolean),
     retentionDays: $("#projRetention").value ? Number($("#projRetention").value) : null,
   };
-
   $("#projSave").disabled = true; $("#projSave").textContent = "Saving…";
   try {
     if (editProjectId) await api("/admin/projects/" + editProjectId, { method: "PATCH", body: JSON.stringify(body) });
@@ -486,7 +730,6 @@ async function saveProject() {
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
 
-// Initial load.
 loadProjects();
 </script>
 </body>

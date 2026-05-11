@@ -30,6 +30,28 @@ internal static class AdminEndpoints
         group.MapGet("/feedbacks/{id:guid}/screenshot", GetScreenshot);
 
         group.MapDelete("/submitters/{submitterId}", DeleteBySubmitter);
+
+        // Phase 3 — comments, stats, export.
+        group.MapGet("/feedbacks/{id:guid}/comments", ListComments);
+        group.MapPost("/feedbacks/{id:guid}/comments", AddComment);
+        group.MapDelete("/feedbacks/{id:guid}/comments/{commentId:guid}", DeleteComment);
+
+        group.MapGet("/stats", GetStats);
+        group.MapGet("/feedbacks/export", ExportFeedbacks);
+
+        // Force re-analysis of a single feedback.
+        group.MapPost("/feedbacks/{id:guid}/reanalyze", ReanalyzeFeedback);
+    }
+
+    private static async Task<IResult> ReanalyzeFeedback(Guid id, IFeedbackStore store, CancellationToken ct)
+    {
+        var fb = await store.GetFeedbackAsync(id, ct);
+        if (fb is null) return Results.NotFound();
+        fb.AnalysisVersion = 0;
+        fb.AnalysisError = null;
+        fb.AnalyzedAt = null;
+        await store.UpdateFeedbackAsync(fb, ct);
+        return Results.Ok(new { id, queued = true });
     }
 
     // ---- Projects ----
@@ -96,11 +118,15 @@ internal static class AdminEndpoints
     private static async Task<IResult> ListFeedbacks(
         IFeedbackStore store,
         Guid? projectId, string? status, string? type,
-        DateTimeOffset? since, string? cursor, int? limit,
+        DateTimeOffset? since, DateTimeOffset? until,
+        string? cursor, int? limit,
+        string? search, string? assignee, string? category, short? priority,
         CancellationToken ct)
     {
         var page = await store.ListFeedbacksAsync(
-            new FeedbackQuery(projectId, status, type, since, cursor, limit ?? 50), ct);
+            new FeedbackQuery(projectId, status, type, since, cursor, limit ?? 50,
+                SearchText: search, Assignee: assignee, Category: category,
+                Priority: priority, Until: until), ct);
         return Results.Ok(page);
     }
 
@@ -128,6 +154,14 @@ internal static class AdminEndpoints
         {
             if (req.Category.Length > 0 && !FeedbackCategory.IsValid(req.Category)) return Results.Problem(title: "Invalid category.", statusCode: 400);
             fb.Category = string.IsNullOrEmpty(req.Category) ? null : req.Category;
+        }
+        if (req.Assignee is not null)
+        {
+            fb.Assignee = string.IsNullOrWhiteSpace(req.Assignee) ? null : req.Assignee.Trim();
+        }
+        if (req.Summary is not null)
+        {
+            fb.Summary = string.IsNullOrWhiteSpace(req.Summary) ? null : req.Summary;
         }
         var saved = await store.UpdateFeedbackAsync(fb, ct);
         return Results.Ok(saved);
@@ -172,11 +206,115 @@ internal static class AdminEndpoints
         }
         return Results.Ok(new { deleted = feedbacks.Count });
     }
+
+    // ---- Phase 3: Comments ----
+
+    private static async Task<IResult> ListComments(Guid id, IFeedbackStore store, CancellationToken ct)
+    {
+        var fb = await store.GetFeedbackAsync(id, ct);
+        if (fb is null) return Results.NotFound();
+        var comments = await store.ListCommentsAsync(id, ct);
+        return Results.Ok(comments);
+    }
+
+    private static async Task<IResult> AddComment(Guid id, CreateCommentRequest req, IFeedbackStore store, TimeProvider clock, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(req.Body)) return Results.Problem(title: "Body required.", statusCode: 400);
+        if (string.IsNullOrWhiteSpace(req.Author)) return Results.Problem(title: "Author required.", statusCode: 400);
+        var fb = await store.GetFeedbackAsync(id, ct);
+        if (fb is null) return Results.NotFound();
+        var c = await store.AddCommentAsync(new FeedbackComment
+        {
+            FeedbackId = id,
+            Body = req.Body.Trim(),
+            Author = req.Author.Trim(),
+            CreatedAt = clock.GetUtcNow(),
+        }, ct);
+        return Results.Created($"/api/v1/admin/feedbacks/{id}/comments/{c.Id}", c);
+    }
+
+    private static async Task<IResult> DeleteComment(Guid id, Guid commentId, IFeedbackStore store, CancellationToken ct)
+    {
+        await store.DeleteCommentAsync(commentId, ct);
+        return Results.NoContent();
+    }
+
+    // ---- Phase 3: Stats ----
+
+    private static async Task<IResult> GetStats(IFeedbackStore store, Guid? projectId, DateTimeOffset? since, CancellationToken ct)
+    {
+        var stats = await store.GetStatsAsync(projectId, since, ct);
+        return Results.Ok(stats);
+    }
+
+    // ---- Phase 3: CSV export ----
+
+    private static async Task<IResult> ExportFeedbacks(
+        IFeedbackStore store,
+        HttpContext ctx,
+        Guid? projectId, string? status, string? type, string? search,
+        DateTimeOffset? since, DateTimeOffset? until,
+        CancellationToken ct)
+    {
+        // Stream up to 10k rows; this keeps memory bounded without paging UI complexity.
+        const int chunk = 500;
+        const int max = 10_000;
+        ctx.Response.ContentType = "text/csv; charset=utf-8";
+        ctx.Response.Headers["Content-Disposition"] = "attachment; filename=feedbacks.csv";
+        await using var sw = new StreamWriter(ctx.Response.Body, new System.Text.UTF8Encoding(true));
+        await sw.WriteLineAsync("id,projectId,createdAt,type,status,category,priority,assignee,text,summary,pageUrl,submitterEmail,submitterId");
+
+        string? cursor = null;
+        int written = 0;
+        while (written < max)
+        {
+            var page = await store.ListFeedbacksAsync(new FeedbackQuery(
+                projectId, status, type, since, cursor, chunk,
+                SearchText: search, Until: until), ct);
+            if (page.Items.Count == 0) break;
+            foreach (var f in page.Items)
+            {
+                await sw.WriteLineAsync(string.Join(",", new[]
+                {
+                    Csv(f.Id.ToString()),
+                    Csv(f.ProjectId.ToString()),
+                    Csv(f.CreatedAt.ToString("o")),
+                    Csv(f.Type),
+                    Csv(f.Status),
+                    Csv(f.Category),
+                    Csv(f.Priority?.ToString()),
+                    Csv(f.Assignee),
+                    Csv(f.Text),
+                    Csv(f.Summary),
+                    Csv(f.PageUrl),
+                    Csv(f.Submitter?.Email),
+                    Csv(f.Submitter?.Id),
+                }));
+                written++;
+                if (written >= max) break;
+            }
+            if (page.NextCursor is null) break;
+            cursor = page.NextCursor;
+        }
+        await sw.FlushAsync(ct);
+        return Results.Empty;
+    }
+
+    private static string Csv(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        // Spreadsheet-safe quoting + neutralize formula-injection vectors.
+        var needsQuote = s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r');
+        var safe = s.Replace("\"", "\"\"");
+        if (safe.Length > 0 && "=+-@".IndexOf(safe[0]) >= 0) safe = "'" + safe;
+        return needsQuote ? $"\"{safe}\"" : safe;
+    }
 }
 
 public sealed record CreateProjectRequest(string Name, List<string>? AllowedOrigins, int? RetentionDays);
 public sealed record UpdateProjectRequest(string? Name, List<string>? AllowedOrigins, int? RetentionDays, bool? Archived);
-public sealed record UpdateFeedbackRequest(string? Status, short? Priority, string? Category);
+public sealed record UpdateFeedbackRequest(string? Status, short? Priority, string? Category, string? Assignee, string? Summary);
+public sealed record CreateCommentRequest(string Body, string Author);
 
 internal sealed class AdminTokenFilter : IEndpointFilter
 {

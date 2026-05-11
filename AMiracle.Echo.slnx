@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AMiracle.Echo.Abstractions/AMiracle.Echo.Abstractions.csproj" />
+    <Project Path="src/AMiracle.Echo.Analysis.Abstractions/AMiracle.Echo.Analysis.Abstractions.csproj" />
+    <Project Path="src/AMiracle.Echo.Analysis.OpenAI/AMiracle.Echo.Analysis.OpenAI.csproj" />
     <Project Path="src/AMiracle.Echo.Cli/AMiracle.Echo.Cli.csproj" />
     <Project Path="src/AMiracle.Echo.Host/AMiracle.Echo.Host.csproj" />
     <Project Path="src/AMiracle.Echo.Server/AMiracle.Echo.Server.csproj" />

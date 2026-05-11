@@ -19,4 +19,22 @@ internal sealed class FeedbackEntity
     public string? ConsentText { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+
+    // Phase 2.
+    public string? Summary { get; set; }
+    public int AnalysisVersion { get; set; }
+    public DateTimeOffset? AnalyzedAt { get; set; }
+    public string? AnalysisError { get; set; }
+
+    // Phase 3.
+    public string? Assignee { get; set; }
+}
+
+internal sealed class FeedbackCommentEntity
+{
+    public Guid Id { get; set; }
+    public Guid FeedbackId { get; set; }
+    public string Body { get; set; } = "";
+    public string Author { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
 }

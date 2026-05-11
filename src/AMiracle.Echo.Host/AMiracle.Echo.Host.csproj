@@ -12,6 +12,8 @@
     <ProjectReference Include="..\AMiracle.Echo.Server\AMiracle.Echo.Server.csproj" />
     <ProjectReference Include="..\AMiracle.Echo.Storage.EFCore\AMiracle.Echo.Storage.EFCore.csproj" />
     <ProjectReference Include="..\AMiracle.Echo.Storage.LocalFS\AMiracle.Echo.Storage.LocalFS.csproj" />
+    <ProjectReference Include="..\AMiracle.Echo.Analysis.OpenAI\AMiracle.Echo.Analysis.OpenAI.csproj" />
+    <ProjectReference Include="..\AMiracle.Echo.Analysis.Abstractions\AMiracle.Echo.Analysis.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

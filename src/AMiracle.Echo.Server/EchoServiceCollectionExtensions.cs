@@ -1,5 +1,6 @@
 using AMiracle.Echo.Abstractions.Configuration;
 using AMiracle.Echo.Abstractions.Processing;
+using AMiracle.Echo.Analysis.Abstractions;
 using AMiracle.Echo.Server.Endpoints;
 using AMiracle.Echo.Server.Services;
 using Microsoft.AspNetCore.Builder;
@@ -16,6 +17,7 @@ public static class EchoServiceCollectionExtensions
     public static IServiceCollection AddAmiracleEcho(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<EchoOptions>(configuration);
+        services.Configure<AnalysisOptions>(configuration.GetSection("Analysis"));
         return AddAmiracleEchoCore(services);
     }
 
@@ -36,6 +38,7 @@ public static class EchoServiceCollectionExtensions
         });
         services.AddSingleton<IFeedbackProcessor, NoOpRedactionProcessor>();
         services.AddHostedService<RetentionSweeper>();
+        services.AddHostedService<AnalysisProcessor>();
         services.AddScoped<AdminTokenFilter>();
         return services;
     }

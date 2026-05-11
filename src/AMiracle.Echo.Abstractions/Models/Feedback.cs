@@ -20,6 +20,25 @@ public sealed class Feedback
     public string? ConsentText { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+
+    // Phase 2 — analysis fields.
+    public string? Summary { get; set; }
+    public int AnalysisVersion { get; set; }      // 0 = not analyzed yet
+    public DateTimeOffset? AnalyzedAt { get; set; }
+    public string? AnalysisError { get; set; }    // last failure reason, if any
+
+    // Phase 3 — triage fields.
+    public string? Assignee { get; set; }
+}
+
+// Phase 3 — feedback comments (triage thread).
+public sealed class FeedbackComment
+{
+    public Guid Id { get; set; }
+    public Guid FeedbackId { get; set; }
+    public string Body { get; set; } = "";
+    public string Author { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
 }
 
 public sealed class Submitter

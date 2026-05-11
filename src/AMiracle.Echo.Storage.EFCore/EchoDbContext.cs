@@ -10,6 +10,7 @@ public sealed class EchoDbContext : DbContext
 
     internal DbSet<ProjectEntity> Projects => Set<ProjectEntity>();
     internal DbSet<FeedbackEntity> Feedbacks => Set<FeedbackEntity>();
+    internal DbSet<FeedbackCommentEntity> FeedbackComments => Set<FeedbackCommentEntity>();
 
     // SQLite cannot ORDER BY DateTimeOffset; store as long ticks to keep ordering portable across providers.
     private static readonly ValueConverter<DateTimeOffset, long> _dtoConverter =
@@ -24,6 +25,8 @@ public sealed class EchoDbContext : DbContext
         b.Entity<ProjectEntity>().Property(p => p.ArchivedAt).HasConversion(_dtoNullableConverter);
         b.Entity<FeedbackEntity>().Property(f => f.CreatedAt).HasConversion(_dtoConverter);
         b.Entity<FeedbackEntity>().Property(f => f.DeletedAt).HasConversion(_dtoNullableConverter);
+        b.Entity<FeedbackEntity>().Property(f => f.AnalyzedAt).HasConversion(_dtoNullableConverter);
+        b.Entity<FeedbackCommentEntity>().Property(c => c.CreatedAt).HasConversion(_dtoConverter);
 
         b.Entity<ProjectEntity>(e =>
         {
@@ -57,9 +60,27 @@ public sealed class EchoDbContext : DbContext
             e.Property(x => x.ConsentText).HasMaxLength(2000);
             e.Property(x => x.CreatedAt);
             e.Property(x => x.DeletedAt);
+            // Phase 2 fields.
+            e.Property(x => x.Summary);
+            e.Property(x => x.AnalysisVersion);
+            e.Property(x => x.AnalyzedAt);
+            e.Property(x => x.AnalysisError).HasMaxLength(2000);
+            // Phase 3 field.
+            e.Property(x => x.Assignee).HasMaxLength(256);
             e.HasIndex(x => new { x.ProjectId, x.CreatedAt });
             e.HasIndex(x => new { x.ProjectId, x.Status });
             e.HasIndex(x => x.SubmitterId);
+            e.HasIndex(x => x.AnalysisVersion); // for "pending analysis" lookups
+            e.HasIndex(x => x.Assignee);
+        });
+
+        b.Entity<FeedbackCommentEntity>(e =>
+        {
+            e.ToTable("feedback_comments");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Body).IsRequired();
+            e.Property(x => x.Author).HasMaxLength(256).IsRequired();
+            e.HasIndex(x => new { x.FeedbackId, x.CreatedAt });
         });
     }
 }
