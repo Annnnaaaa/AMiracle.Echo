@@ -5,20 +5,22 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AMiracle.Echo — Admin</title>
 <style>
-  :root { --bg:#fff; --fg:#1a1a1a; --muted:#6b7280; --border:#e5e7eb; --primary:#4f46e5; --row-hover:#f9fafb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f0f12; --fg:#f4f4f5; --muted:#9ca3af; --border:#27272a; --row-hover:#18181b; } }
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#6b7280; --border:#e5e7eb; --primary:#4f46e5; --row-hover:#f9fafb; --card:#fafafa; --error-bg:#fee2e2; --error-fg:#991b1b; --info-bg:#dbeafe; --info-fg:#1e3a8a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f0f12; --fg:#f4f4f5; --muted:#9ca3af; --border:#27272a; --row-hover:#18181b; --card:#18181b; --error-bg:#7f1d1d; --error-fg:#fecaca; --info-bg:#1e3a8a; --info-fg:#dbeafe; } }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background: var(--bg); color: var(--fg); }
   header { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   header h1 { margin: 0; font-size: 18px; font-weight: 600; }
   header .spacer { flex: 1; }
+  header .help { font-size: 12px; color: var(--muted); margin-right: 4px; }
   main { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 53px); }
   aside { border-right: 1px solid var(--border); padding: 12px; overflow: auto; }
   aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 8px 0; }
-  aside .project { padding: 8px; border-radius: 6px; cursor: pointer; }
+  aside .project { padding: 8px; border-radius: 6px; cursor: pointer; margin-bottom: 2px; }
   aside .project:hover { background: var(--row-hover); }
   aside .project.active { background: var(--primary); color: #fff; }
-  aside .project small { display: block; opacity: .7; }
+  aside .project small { display: block; opacity: .7; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; word-break: break-all; }
+  aside .project.archived { opacity: .55; font-style: italic; }
   section { padding: 16px; overflow: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -26,9 +28,11 @@
   tr.row { cursor: pointer; }
   tr.row:hover td { background: var(--row-hover); }
   button, input, select, textarea { font-family: inherit; font-size: 14px; color: inherit; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; }
-  button.primary { background: var(--primary); color: #fff; border: 0; cursor: pointer; }
-  button.danger { background: #b91c1c; color: #fff; border: 0; cursor: pointer; }
-  button.ghost { background: transparent; cursor: pointer; }
+  button { cursor: pointer; }
+  button.primary { background: var(--primary); color: #fff; border: 0; }
+  button.danger { background: #b91c1c; color: #fff; border: 0; }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); }
   .pill.new { background: #dbeafe; color: #1e40af; border: 0; }
   .pill.triaged { background: #fde68a; color: #78350f; border: 0; }
@@ -38,21 +42,48 @@
   pre { white-space: pre-wrap; word-break: break-word; background: var(--row-hover); padding: 10px; border-radius: 6px; }
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
   .empty { color: var(--muted); padding: 40px; text-align: center; }
-  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 20px; background: var(--bg); color: var(--fg); width: min(420px, 92vw); }
+  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 20px; background: var(--bg); color: var(--fg); width: min(440px, 92vw); }
   dialog::backdrop { background: rgba(0,0,0,.4); }
   label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .field { margin-bottom: 12px; }
   .field input, .field textarea { width: 100%; }
+  .help-text { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Project detail card */
+  .pcard { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+  .pcard h2 { margin: 0 0 4px 0; font-size: 18px; font-weight: 600; }
+  .pcard .archived-pill { display:inline-block; background:#fef3c7; color:#92400e; font-size:11px; padding:2px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+  .pcard .row-meta { display: grid; grid-template-columns: 110px 1fr; gap: 4px 12px; margin-top: 10px; font-size: 13px; }
+  .pcard .row-meta dt { color: var(--muted); font-weight: 500; }
+  .pcard .row-meta dd { margin: 0; word-break: break-all; }
+  .pcard .key { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--row-hover); padding: 2px 6px; border-radius: 4px; }
+  .pcard .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .pcard button { font-size: 13px; padding: 5px 10px; }
+
+  /* Error/info toasts */
+  .banner { padding: 10px 14px; border-radius: 8px; margin: 0 16px 12px 16px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+  .banner.error { background: var(--error-bg); color: var(--error-fg); }
+  .banner.info { background: var(--info-bg); color: var(--info-fg); }
+  .banner button { background: transparent; border: 0; color: inherit; cursor: pointer; font-weight: bold; opacity: .7; }
+  .banner code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+  /* Inline dialog error */
+  .dialog-error { color: #b91c1c; font-size: 13px; margin-bottom: 8px; }
+  @media (prefers-color-scheme: dark) { .dialog-error { color: #fca5a5; } }
 </style>
 </head>
 <body>
 <header>
   <h1>AMiracle.Echo — Admin</h1>
   <div class="spacer"></div>
-  <input id="token" placeholder="Admin bearer token" type="password" style="width:280px">
+  <span class="help" title="Set on the server via env var AMiracle__Echo__AdminToken or appsettings.json (see README).">Admin token:</span>
+  <input id="token" placeholder="bearer token from server config" type="password" style="width:280px" autocomplete="off">
   <button class="primary" id="saveToken">Save</button>
-  <button class="ghost" id="logout">Forget token</button>
+  <button class="ghost" id="logout">Forget</button>
 </header>
+
+<div id="banner" class="banner" hidden></div>
+
 <main>
   <aside>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -61,25 +92,28 @@
     </div>
     <div id="projects"></div>
   </aside>
-  <section>
-    <div class="toolbar">
-      <select id="filterStatus">
-        <option value="">All statuses</option><option value="new">new</option><option value="triaged">triaged</option><option value="resolved">resolved</option>
-      </select>
-      <select id="filterType">
-        <option value="">All types</option><option value="text">text</option><option value="voice">voice</option>
-      </select>
-      <button class="ghost" id="refresh">Refresh</button>
-    </div>
-    <div id="feedbacksContainer"><div class="empty">Pick a project from the left.</div></div>
+  <section id="mainSection">
+    <div class="empty" id="rootEmpty">Paste your admin token above and click <b>Save</b> to begin.</div>
   </section>
 </main>
 
 <dialog id="projectDialog">
   <h3 id="projectDialogTitle">New project</h3>
-  <div class="field"><label>Name</label><input id="projName"></div>
-  <div class="field"><label>Allowed origins (comma-separated)</label><input id="projOrigins" placeholder="https://example.com"></div>
-  <div class="field"><label>Retention days (blank = forever)</label><input id="projRetention" type="number" min="1"></div>
+  <div class="dialog-error" id="projectDialogError" hidden></div>
+  <div class="field">
+    <label>Name <span style="color:#b91c1c">*</span></label>
+    <input id="projName" required>
+  </div>
+  <div class="field">
+    <label>Allowed origins (comma-separated)</label>
+    <input id="projOrigins" placeholder="https://myapp.com, http://localhost:8080">
+    <div class="help-text">Browser origins the widget is allowed to submit feedback from. Leave blank to accept any origin (not recommended for production). Use <code>*.example.com</code> for subdomain wildcards.</div>
+  </div>
+  <div class="field">
+    <label>Retention days (blank = keep forever)</label>
+    <input id="projRetention" type="number" min="1">
+    <div class="help-text">Feedbacks older than this are auto-deleted by the retention sweeper.</div>
+  </div>
   <div style="display:flex;gap:8px;justify-content:flex-end">
     <button class="ghost" id="projCancel">Cancel</button>
     <button class="primary" id="projSave">Save</button>
@@ -99,39 +133,109 @@
 const $ = s => document.querySelector(s);
 const state = { token: localStorage.getItem("echoToken") || "", projects: [], activeProject: null, feedbacks: [] };
 
+// ===== Banner / error surfacing =====
+function showBanner(type, html, autoHide = false) {
+  const b = $("#banner");
+  b.className = "banner " + type;
+  b.hidden = false;
+  b.innerHTML = `<div style="flex:1">${html}</div><button title="Dismiss" aria-label="Dismiss">✕</button>`;
+  b.querySelector("button").onclick = hideBanner;
+  if (autoHide) setTimeout(hideBanner, 4000);
+}
+function hideBanner() { $("#banner").hidden = true; }
+function showError(msg) { showBanner("error", "<strong>Error:</strong> " + esc(msg)); }
+function showInfo(msg) { showBanner("info", esc(msg), true); }
+
+// ===== API wrapper =====
+async function api(path, opts = {}) {
+  if (!state.token) throw new Error("No admin token set. Paste it above and click Save.");
+  opts.headers = Object.assign({ "Authorization": "Bearer " + state.token, "Content-Type": "application/json" }, opts.headers || {});
+  let r;
+  try { r = await fetch("/api/v1" + path, opts); }
+  catch (e) { throw new Error("Network failure: " + e.message); }
+  if (!r.ok) {
+    let body = "";
+    try { body = await r.text(); } catch {}
+    if (r.status === 401) throw new Error("Token rejected (401). Check it matches AMiracle__Echo__AdminToken on the server.");
+    if (r.status === 403) throw new Error("Forbidden (403).");
+    try {
+      const j = JSON.parse(body);
+      throw new Error(`${r.status} — ${j.title || r.statusText}${j.detail ? ": " + j.detail : ""}`);
+    } catch (parseErr) {
+      if (parseErr.message.startsWith(r.status + "")) throw parseErr;
+      throw new Error(`${r.status} ${r.statusText}: ${body.slice(0, 200)}`);
+    }
+  }
+  return r.status === 204 ? null : r.json();
+}
+
+// ===== Header wiring =====
 $("#token").value = state.token;
-$("#saveToken").onclick = () => { state.token = $("#token").value.trim(); localStorage.setItem("echoToken", state.token); loadProjects(); };
-$("#logout").onclick = () => { state.token = ""; localStorage.removeItem("echoToken"); $("#token").value = ""; render(); };
-$("#refresh").onclick = () => loadFeedbacks();
-$("#filterStatus").onchange = () => loadFeedbacks();
-$("#filterType").onchange = () => loadFeedbacks();
-$("#newProject").onclick = () => openProjectDialog();
+$("#saveToken").onclick = async () => {
+  state.token = $("#token").value.trim();
+  if (!state.token) { showError("Token cannot be empty."); return; }
+  localStorage.setItem("echoToken", state.token);
+  hideBanner();
+  await loadProjects(true);
+};
+$("#logout").onclick = () => {
+  state.token = "";
+  localStorage.removeItem("echoToken");
+  $("#token").value = "";
+  state.projects = []; state.activeProject = null;
+  renderProjects([]); renderRoot();
+  hideBanner();
+};
+$("#newProject").onclick = () => {
+  if (!state.token) { showError("Set an admin token first."); return; }
+  openProjectDialog();
+};
 $("#projCancel").onclick = () => $("#projectDialog").close();
 $("#projSave").onclick = saveProject;
 $("#fbClose").onclick = () => $("#feedbackDialog").close();
 
-async function api(path, opts = {}) {
-  opts.headers = Object.assign({ "Authorization": "Bearer " + state.token, "Content-Type": "application/json" }, opts.headers || {});
-  const r = await fetch("/api/v1" + path, opts);
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.status === 204 ? null : r.json();
-}
-
-async function loadProjects() {
-  if (!state.token) { renderProjects([]); return; }
-  try { state.projects = await api("/admin/projects"); }
-  catch (e) { alert("Token rejected or server error: " + e.message); return; }
+// ===== Projects =====
+async function loadProjects(announceSuccess = false) {
+  if (!state.token) { renderProjects([]); renderRoot(); return; }
+  try {
+    state.projects = await api("/admin/projects");
+  } catch (e) {
+    showError(e.message);
+    renderProjects([]); renderRoot();
+    return;
+  }
   renderProjects(state.projects);
-  if (state.projects.length && !state.activeProject) selectProject(state.projects[0]);
+  if (announceSuccess && state.projects.length === 0) {
+    showInfo("Connected. No projects yet — click ‘+ New’ in the sidebar to create one.");
+  }
+  if (state.projects.length) {
+    if (!state.activeProject || !state.projects.find(p => p.id === state.activeProject.id)) {
+      selectProject(state.projects[0]);
+    } else {
+      // Refresh the active project's data after edits/rotate-key.
+      state.activeProject = state.projects.find(p => p.id === state.activeProject.id);
+      renderRoot();
+    }
+  } else {
+    renderRoot();
+  }
 }
 
 function renderProjects(list) {
   const root = $("#projects");
   root.innerHTML = "";
+  if (!state.token) {
+    root.innerHTML = `<div class="help-text">Sign in with admin token to load projects.</div>`;
+    return;
+  }
+  if (!list.length) {
+    root.innerHTML = `<div class="help-text">No projects yet.</div>`;
+    return;
+  }
   for (const p of list) {
     const div = document.createElement("div");
-    div.className = "project" + (state.activeProject?.id === p.id ? " active" : "");
-    div.innerHTML = `<div>${esc(p.name)}</div><small>${esc(p.publicKey)}</small>`;
+    div.className = "project" + (state.activeProject?.id === p.id ? " active" : "") + (p.archivedAt ? " archived" : "");
+    div.innerHTML = `<div>${esc(p.name)}${p.archivedAt ? " (archived)" : ""}</div><small>${esc(p.publicKey)}</small>`;
     div.onclick = () => selectProject(p);
     root.appendChild(div);
   }
@@ -140,22 +244,133 @@ function renderProjects(list) {
 function selectProject(p) {
   state.activeProject = p;
   renderProjects(state.projects);
+  renderRoot();
   loadFeedbacks();
 }
 
+// ===== Main section render =====
+function renderRoot() {
+  const section = $("#mainSection");
+  if (!state.token) {
+    section.innerHTML = `<div class="empty">Paste your admin token above and click <b>Save</b> to begin.<br><br><span class="help-text">The token is the value of <code>AMiracle__Echo__AdminToken</code> on the server (env var or <code>appsettings.json</code>).</span></div>`;
+    return;
+  }
+  if (!state.activeProject) {
+    section.innerHTML = `<div class="empty">Pick a project from the left, or create one with <b>+ New</b>.</div>`;
+    return;
+  }
+  const p = state.activeProject;
+  const archived = p.archivedAt ? `<span class="archived-pill">archived</span>` : "";
+  const origins = (p.allowedOrigins || []).length
+    ? (p.allowedOrigins || []).map(o => `<span class="key">${esc(o)}</span>`).join(" ")
+    : `<span class="help-text">⚠ none — accepts any origin (not recommended for production)</span>`;
+  section.innerHTML = `
+    <div class="pcard">
+      <h2>${esc(p.name)} ${archived}</h2>
+      <div class="help-text">Created ${new Date(p.createdAt).toLocaleString()}</div>
+      <dl class="row-meta">
+        <dt>Project ID</dt><dd><span class="key">${esc(p.id)}</span></dd>
+        <dt>Public key</dt><dd><span class="key">${esc(p.publicKey)}</span> <button class="ghost" data-act="copy-key" title="Copy">📋</button></dd>
+        <dt>Allowed origins</dt><dd>${origins}</dd>
+        <dt>Retention</dt><dd>${p.retentionDays ? p.retentionDays + " days" : "forever (no auto-delete)"}</dd>
+      </dl>
+      <div class="actions">
+        <button class="primary" data-act="edit">Edit</button>
+        <button class="ghost"   data-act="rotate">Rotate public key</button>
+        <button class="ghost"   data-act="archive">${p.archivedAt ? "Unarchive" : "Archive"}</button>
+        <button class="danger"  data-act="delete">Delete project…</button>
+        <button class="ghost"   data-act="snippet">Show widget snippet</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <h3 style="margin:0 8px 0 0">Feedback</h3>
+      <select id="filterStatus">
+        <option value="">All statuses</option><option value="new">new</option><option value="triaged">triaged</option><option value="resolved">resolved</option>
+      </select>
+      <select id="filterType">
+        <option value="">All types</option><option value="text">text</option><option value="voice">voice</option>
+      </select>
+      <button class="ghost" id="refresh">Refresh</button>
+    </div>
+    <div id="feedbacksContainer"><div class="empty">Loading…</div></div>
+  `;
+
+  // Project card actions.
+  section.querySelector('[data-act="copy-key"]')?.addEventListener("click", () => {
+    navigator.clipboard.writeText(p.publicKey); showInfo("Public key copied.");
+  });
+  section.querySelector('[data-act="edit"]')?.addEventListener("click", () => openProjectDialog(p));
+  section.querySelector('[data-act="rotate"]')?.addEventListener("click", rotateActiveKey);
+  section.querySelector('[data-act="archive"]')?.addEventListener("click", toggleArchiveActive);
+  section.querySelector('[data-act="delete"]')?.addEventListener("click", deleteActiveProject);
+  section.querySelector('[data-act="snippet"]')?.addEventListener("click", showSnippet);
+
+  $("#refresh").onclick = () => loadFeedbacks();
+  $("#filterStatus").onchange = () => loadFeedbacks();
+  $("#filterType").onchange = () => loadFeedbacks();
+}
+
+async function rotateActiveKey() {
+  if (!confirm("Rotate the public key? The current key will stop working immediately. You'll need to update widget snippets.")) return;
+  try {
+    await api("/admin/projects/" + state.activeProject.id + "/rotate-key", { method: "POST" });
+    showInfo("Public key rotated.");
+    await loadProjects();
+  } catch (e) { showError(e.message); }
+}
+
+async function toggleArchiveActive() {
+  const p = state.activeProject;
+  try {
+    await api("/admin/projects/" + p.id, { method: "PATCH", body: JSON.stringify({ archived: !p.archivedAt }) });
+    await loadProjects();
+  } catch (e) { showError(e.message); }
+}
+
+async function deleteActiveProject() {
+  const p = state.activeProject;
+  if (!confirm(`Delete project "${p.name}"? This permanently removes the project AND all its feedbacks and blob attachments. Cannot be undone.`)) return;
+  if (!confirm(`Really delete "${p.name}"? Type-confirm by clicking OK once more.`)) return;
+  try {
+    await api("/admin/projects/" + p.id, { method: "DELETE" });
+    state.activeProject = null;
+    showInfo("Project deleted.");
+    await loadProjects();
+  } catch (e) { showError(e.message); }
+}
+
+function showSnippet() {
+  const p = state.activeProject;
+  const url = location.origin + "/echo/widget.js";
+  showBanner("info", `
+    <div>Drop this on your page (after replacing origins as needed):</div>
+    <pre style="margin:8px 0 0 0">&lt;script src="${url}"
+        data-project-id="${esc(p.id)}"
+        data-public-key="${esc(p.publicKey)}"
+        defer&gt;&lt;/script&gt;</pre>
+  `);
+}
+
+// ===== Feedbacks =====
 async function loadFeedbacks() {
   if (!state.activeProject) return;
   const params = new URLSearchParams({ projectId: state.activeProject.id, limit: "100" });
-  if ($("#filterStatus").value) params.set("status", $("#filterStatus").value);
-  if ($("#filterType").value) params.set("type", $("#filterType").value);
-  const page = await api("/admin/feedbacks?" + params.toString());
-  state.feedbacks = page.items;
-  renderFeedbacks();
+  const fs = $("#filterStatus"); if (fs?.value) params.set("status", fs.value);
+  const ft = $("#filterType"); if (ft?.value) params.set("type", ft.value);
+  try {
+    const page = await api("/admin/feedbacks?" + params.toString());
+    state.feedbacks = page.items || [];
+    renderFeedbacks();
+  } catch (e) {
+    showError(e.message);
+  }
 }
 
 function renderFeedbacks() {
   const root = $("#feedbacksContainer");
-  if (!state.feedbacks.length) { root.innerHTML = `<div class="empty">No feedback yet.</div>`; return; }
+  if (!root) return;
+  if (!state.feedbacks.length) { root.innerHTML = `<div class="empty">No feedback yet for this project.</div>`; return; }
   const rows = state.feedbacks.map(f => `
     <tr class="row" data-id="${f.id}">
       <td>${new Date(f.createdAt).toLocaleString()}</td>
@@ -173,24 +388,27 @@ function renderFeedbacks() {
 }
 
 async function openFeedback(id) {
-  const fb = await api("/admin/feedbacks/" + id);
-  $("#feedbackBody").innerHTML = renderFeedbackDetail(fb);
-  $("#fbDelete").onclick = async () => {
-    if (!confirm("Permanently delete this feedback?")) return;
-    await api("/admin/feedbacks/" + id, { method: "DELETE" });
-    $("#feedbackDialog").close();
-    loadFeedbacks();
-  };
-  $("#feedbackDialog").showModal();
-  // Wire status/priority/category edits.
-  $("#fbStatus")?.addEventListener("change", e => patchFb(id, { status: e.target.value }));
-  $("#fbPriority")?.addEventListener("change", e => patchFb(id, { priority: e.target.value ? Number(e.target.value) : null }));
-  $("#fbCategory")?.addEventListener("change", e => patchFb(id, { category: e.target.value || null }));
+  try {
+    const fb = await api("/admin/feedbacks/" + id);
+    $("#feedbackBody").innerHTML = renderFeedbackDetail(fb);
+    $("#fbDelete").onclick = async () => {
+      if (!confirm("Permanently delete this feedback?")) return;
+      try {
+        await api("/admin/feedbacks/" + id, { method: "DELETE" });
+        $("#feedbackDialog").close();
+        loadFeedbacks();
+      } catch (e) { showError(e.message); }
+    };
+    $("#feedbackDialog").showModal();
+    $("#fbStatus")?.addEventListener("change", e => patchFb(id, { status: e.target.value }));
+    $("#fbPriority")?.addEventListener("change", e => patchFb(id, { priority: e.target.value ? Number(e.target.value) : null }));
+    $("#fbCategory")?.addEventListener("change", e => patchFb(id, { category: e.target.value || null }));
+  } catch (e) { showError(e.message); }
 }
 
 async function patchFb(id, body) {
-  await api("/admin/feedbacks/" + id, { method: "PATCH", body: JSON.stringify(body) });
-  loadFeedbacks();
+  try { await api("/admin/feedbacks/" + id, { method: "PATCH", body: JSON.stringify(body) }); loadFeedbacks(); }
+  catch (e) { showError(e.message); }
 }
 
 function renderFeedbackDetail(f) {
@@ -225,31 +443,50 @@ function renderFeedbackDetail(f) {
     </div>`;
 }
 
+// ===== Project dialog =====
 let editProjectId = null;
 function openProjectDialog(p = null) {
   editProjectId = p?.id || null;
   $("#projectDialogTitle").textContent = p ? "Edit project" : "New project";
   $("#projName").value = p?.name || "";
-  $("#projOrigins").value = (p?.allowedOrigins || []).join(",");
+  $("#projOrigins").value = (p?.allowedOrigins || []).join(", ");
   $("#projRetention").value = p?.retentionDays || "";
+  $("#projectDialogError").hidden = true; $("#projectDialogError").textContent = "";
+  $("#projSave").disabled = false; $("#projSave").textContent = "Save";
   $("#projectDialog").showModal();
+  $("#projName").focus();
 }
 
 async function saveProject() {
+  const err = $("#projectDialogError");
+  err.hidden = true; err.textContent = "";
+  const name = $("#projName").value.trim();
+  if (!name) { err.hidden = false; err.textContent = "Name is required."; return; }
+  if (!state.token) { err.hidden = false; err.textContent = "No admin token set. Cancel and set the token first."; return; }
+
   const body = {
-    name: $("#projName").value.trim(),
+    name,
     allowedOrigins: $("#projOrigins").value.split(",").map(s => s.trim()).filter(Boolean),
     retentionDays: $("#projRetention").value ? Number($("#projRetention").value) : null,
   };
-  if (editProjectId) await api("/admin/projects/" + editProjectId, { method: "PATCH", body: JSON.stringify(body) });
-  else await api("/admin/projects", { method: "POST", body: JSON.stringify(body) });
-  $("#projectDialog").close();
-  await loadProjects();
+
+  $("#projSave").disabled = true; $("#projSave").textContent = "Saving…";
+  try {
+    if (editProjectId) await api("/admin/projects/" + editProjectId, { method: "PATCH", body: JSON.stringify(body) });
+    else await api("/admin/projects", { method: "POST", body: JSON.stringify(body) });
+    $("#projectDialog").close();
+    showInfo(editProjectId ? "Project updated." : "Project created.");
+    await loadProjects();
+  } catch (e) {
+    err.hidden = false; err.textContent = e.message;
+  } finally {
+    $("#projSave").disabled = false; $("#projSave").textContent = "Save";
+  }
 }
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
 
-function render() { renderProjects(state.projects); }
+// Initial load.
 loadProjects();
 </script>
 </body>

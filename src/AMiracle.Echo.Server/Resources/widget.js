@@ -84,6 +84,16 @@
     .send:disabled { opacity: .6; cursor: not-allowed; }
     .timer { font-variant-numeric: tabular-nums; opacity: .8; font-size: 12px; }
     .preview { max-width: 100%; border-radius: 8px; border: 1px solid var(--echo-border, #d4d4d8); }
+    .thumb-row { display: flex; align-items: center; gap: 8px; }
+    .thumb {
+      width: 56px; height: 56px; object-fit: cover; cursor: zoom-in;
+      border-radius: 6px; border: 1px solid var(--echo-border, #d4d4d8); flex-shrink: 0;
+    }
+    .lightbox {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 2147483647;
+      display: grid; place-items: center; cursor: zoom-out;
+    }
+    .lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
     .label { font-size: 12px; opacity: .7; }
     input[type=email], select {
       width: 100%; padding: 6px 10px; border: 1px solid var(--echo-border, #d4d4d8); border-radius: 8px;
@@ -312,14 +322,27 @@
       if (!this._screenshotBlob) return;
       const url = URL.createObjectURL(this._screenshotBlob);
       this._shotPreview.hidden = false;
-      this._shotPreview.innerHTML =
-        `<img class="preview" src="${url}" alt="">
-         <button class="btn" type="button" data-action="remove-shot">${esc(this._strings.remove)}</button>`;
+      this._shotPreview.innerHTML = `
+        <div class="thumb-row">
+          <img class="thumb" src="${url}" alt="Screenshot preview" title="Click to enlarge">
+          <span style="font-size:12px;opacity:.8">Screenshot attached</span>
+          <button class="btn" type="button" data-action="remove-shot">${esc(this._strings.remove)}</button>
+        </div>`;
+      const thumb = this._shotPreview.querySelector(".thumb");
+      thumb.addEventListener("click", () => this._openLightbox(url));
       this._shotPreview.querySelector('[data-action="remove-shot"]').addEventListener("click", () => {
         this._screenshotBlob = null;
         this._shotPreview.hidden = true;
         this._shotPreview.innerHTML = "";
       });
+    }
+
+    _openLightbox(url) {
+      const box = document.createElement("div");
+      box.className = "lightbox";
+      box.innerHTML = `<img src="${url}" alt="Screenshot">`;
+      box.addEventListener("click", () => box.remove());
+      this.shadowRoot.appendChild(box);
     }
 
     _showError(msg) {

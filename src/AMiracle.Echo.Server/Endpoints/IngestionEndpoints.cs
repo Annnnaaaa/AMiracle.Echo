@@ -17,6 +17,20 @@ internal static class IngestionEndpoints
     {
         var group = routes.MapGroup("/api/v1/feedbacks");
 
+        // Reflect Access-Control-Allow-Origin on EVERY ingestion response (success or error)
+        // so the browser surfaces 401/403/400 bodies to JS instead of opaque CORS failures.
+        // The actual security comes from project-key + origin allowlist checks, not CORS.
+        group.AddEndpointFilter(async (ctx, next) =>
+        {
+            var origin = ctx.HttpContext.Request.Headers["Origin"].ToString();
+            if (!string.IsNullOrEmpty(origin))
+            {
+                ctx.HttpContext.Response.Headers["Access-Control-Allow-Origin"] = origin;
+                ctx.HttpContext.Response.Headers.Append("Vary", "Origin");
+            }
+            return await next(ctx);
+        });
+
         group.MapPost("/", CreateFeedback);
         group.MapPost("/{id:guid}/audio", UploadAudio);
         group.MapPost("/{id:guid}/screenshot", UploadScreenshot);
@@ -140,13 +154,7 @@ internal static class IngestionEndpoints
         if (!OriginValidator.IsAllowed(origin, project.AllowedOrigins))
             return (null, Problem(StatusCodes.Status403Forbidden, "origin-not-allowed", $"Origin '{origin}' not in project's allowed origins.", null));
 
-        // CORS reflection for ingestion (only when origin is allowed).
-        if (!string.IsNullOrEmpty(origin))
-        {
-            ctx.Response.Headers["Access-Control-Allow-Origin"] = origin;
-            ctx.Response.Headers["Vary"] = "Origin";
-        }
-
+        // CORS headers are set by the ingestion group's endpoint filter regardless of outcome.
         return (project, null);
     }
 
