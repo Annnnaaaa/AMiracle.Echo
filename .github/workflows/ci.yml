@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & pack (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Full history so SourceLink can resolve commits.
+
+      - name: Set up .NET 8 + .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore AMiracle.Echo.slnx
+
+      - name: Build (Release)
+        run: dotnet build AMiracle.Echo.slnx --configuration Release --no-restore
+
+      - name: Pack
+        run: dotnet pack AMiracle.Echo.slnx --configuration Release --no-build --output ./artifacts
+
+      - name: Upload package artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs
+          path: ./artifacts/*.*nupkg
+          if-no-files-found: error

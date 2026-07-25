@@ -203,6 +203,46 @@ async function api(path, opts = {}) {
   return r.status === 204 ? null : r.json();
 }
 
+// ===== Fetch a binary blob with bearer auth, then plug it into a tag via object URL =====
+// targetSel: '#fbScreenshot' for <img>, '#fbAudio' for <audio>
+// statusSel: an element to update with progress/error text
+// isImage:   true to wire click-to-zoom on the resulting img
+async function loadAuthedBlob(url, targetSel, statusSel, isImage) {
+  const el = document.querySelector(targetSel);
+  const status = document.querySelector(statusSel);
+  if (!el) return; // nothing to load (no screenshot/audio on this feedback)
+  try {
+    const r = await fetch(url, { headers: { "Authorization": "Bearer " + state.token } });
+    if (!r.ok) {
+      el.remove();
+      if (status) status.textContent = r.status === 404 ? "(not available)" : `Failed to load (${r.status}).`;
+      return;
+    }
+    const blob = await r.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    (state.objectUrls ||= []).push(objectUrl);
+    el.src = objectUrl;
+    if (status) status.remove();
+    if (isImage) {
+      el.alt = "Screenshot";
+      el.addEventListener("click", () => openLightbox(objectUrl));
+    }
+  } catch (e) {
+    if (status) status.textContent = "Failed to load: " + e.message;
+  }
+}
+
+function openLightbox(src) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:99999;display:grid;place-items:center;cursor:zoom-out;";
+  const img = document.createElement("img");
+  img.src = src;
+  img.style.cssText = "max-width:94vw;max-height:94vh;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);";
+  overlay.appendChild(img);
+  overlay.addEventListener("click", () => overlay.remove());
+  document.body.appendChild(overlay);
+}
+
 // ===== Header =====
 $("#token").value = state.token;
 $("#saveToken").onclick = async () => {
@@ -225,6 +265,10 @@ $("#newProject").onclick = () => {
 $("#projCancel").onclick = () => $("#projectDialog").close();
 $("#projSave").onclick = saveProject;
 $("#fbClose").onclick = () => $("#feedbackDialog").close();
+$("#feedbackDialog").addEventListener("close", () => {
+  (state.objectUrls || []).forEach(u => URL.revokeObjectURL(u));
+  state.objectUrls = [];
+});
 $("#fbReanalyze").onclick = reanalyzeActive;
 
 // ===== Projects =====
@@ -551,10 +595,16 @@ function timeChart(title, dict) {
 // ===== Feedback detail =====
 async function openFeedback(id) {
   state.currentFeedbackId = id;
+  // Revoke any previously created object URLs (avoid memory leaks).
+  (state.objectUrls || []).forEach(u => URL.revokeObjectURL(u));
+  state.objectUrls = [];
   try {
     const fb = await api("/admin/feedbacks/" + id);
     state.comments = await api(`/admin/feedbacks/${id}/comments`);
     $("#feedbackBody").innerHTML = renderFeedbackDetail(fb, state.comments);
+    // Fetch screenshot / audio with bearer auth and wire object URLs into the tags.
+    loadAuthedBlob(`/api/v1/admin/feedbacks/${id}/screenshot`, "#fbScreenshot", "#fbScreenshotStatus", true);
+    loadAuthedBlob(`/api/v1/admin/feedbacks/${id}/audio`,     "#fbAudio",      "#fbAudioStatus",       false);
     $("#fbDelete").onclick = async () => {
       if (!confirm("Permanently delete this feedback?")) return;
       try { await api("/admin/feedbacks/" + id, { method: "DELETE" }); $("#feedbackDialog").close(); loadFeedbacks(); }
@@ -623,10 +673,17 @@ function renderComments(list, id) {
 }
 
 function renderFeedbackDetail(f, comments) {
+  // Audio/screenshot tags rendered as empty placeholders here; openFeedback() fetches
+  // the bytes with the admin bearer token and assigns object URLs after render.
+  // (Browsers don't send custom Authorization headers on <img>/<audio> requests.)
   const audio = f.audioBlobKey && !String(f.audioBlobKey).startsWith("pending:")
-    ? `<audio controls preload="metadata" src="/api/v1/admin/feedbacks/${f.id}/audio" style="width:100%"></audio>` : "";
+    ? `<audio id="fbAudio" controls preload="metadata" style="width:100%"></audio>
+       <div id="fbAudioStatus" class="help-text">Loading audio…</div>` : "";
   const shot = f.screenshotKey && !String(f.screenshotKey).startsWith("pending:")
-    ? `<img src="/api/v1/admin/feedbacks/${f.id}/screenshot" style="max-width:100%;border-radius:6px;border:1px solid var(--border)">` : "";
+    ? `<div>
+         <img id="fbScreenshot" alt="Loading screenshot…" style="max-width:100%;border-radius:6px;border:1px solid var(--border);min-height:40px;cursor:zoom-in" title="Click to open full-size">
+         <div id="fbScreenshotStatus" class="help-text">Loading screenshot…</div>
+       </div>` : "";
 
   // Analysis status pill
   let analysisBar = "";

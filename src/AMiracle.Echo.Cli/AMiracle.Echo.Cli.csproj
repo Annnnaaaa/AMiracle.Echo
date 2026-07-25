@@ -1,15 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
+    <TargetFramework>net8.0</TargetFramework>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>amiracle-echo</ToolCommandName>
     <PackageId>AMiracle.Echo.Cli</PackageId>
-    <Description>CLI for managing AMiracle.Echo projects and feedbacks.</Description>
+    <Description>Command-line tool for AMiracle.Echo: list/create/delete projects, list/show/delete feedbacks, change status/priority/assignee, download audio/screenshots, and run GDPR submitter erasure. Install with: dotnet tool install --global AMiracle.Echo.Cli</Description>
+    <PackageTags>cli;tool;feedback;dotnet-tool;amiracle</PackageTags>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
 </Project>

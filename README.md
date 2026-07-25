@@ -1,6 +1,9 @@
 # AMiracle.Echo
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/) [![Status](https://img.shields.io/badge/status-Phase%201-orange)](ROADMAP.md)
+[![CI](https://github.com/Annnnaaaa/AMiracle.Echo/actions/workflows/ci.yml/badge.svg)](https://github.com/Annnnaaaa/AMiracle.Echo/actions/workflows/ci.yml)
+[![NuGet](https://img.shields.io/nuget/v/AMiracle.Echo.Server.svg?label=AMiracle.Echo.Server)](https://www.nuget.org/packages/AMiracle.Echo.Server/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![.NET 8 + .NET 10](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-512BD4)](https://dotnet.microsoft.com/)
 
 Drop-in feedback collection for any web app. Single-`<script>` widget that captures **text, voice, and screenshots**, plus an ASP.NET Core backend with pluggable storage. MIT licensed, OSS.
 
@@ -108,6 +111,28 @@ docker run -d --name echo \
 ```
 
 Same admin URL: <http://localhost:8080/echo/admin>.
+
+### Option C — Postgres via Neon (free tier, ~10 minutes)
+
+Want a real Postgres for production / shared dev without standing up your own server? [Neon](https://neon.tech) is serverless Postgres with a generous free tier and an HTTPS-only connection string. Echo runs against it out of the box.
+
+1. **Sign up at <https://neon.tech>** and create a new project (any region close to your Echo host).
+2. In the Neon dashboard, copy the **connection string** for the `Direct connection / .NET` view. It looks like
+   `Host=ep-something.eu-central-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=...;SSL Mode=Require;Trust Server Certificate=true`
+3. Set it on the Echo host:
+   ```powershell
+   $env:AMiracle__Echo__Database__Provider = "postgres"
+   $env:AMiracle__Echo__Database__ConnectionString = "Host=ep-...neon.tech;Database=neondb;Username=...;Password=...;SSL Mode=Require;Trust Server Certificate=true"
+   $env:AMiracle__Echo__AdminToken = "your-32-byte-token"
+   dotnet run --project src/AMiracle.Echo.Host --no-launch-profile
+   ```
+4. The first run creates the `projects`, `feedbacks`, and `feedback_comments` tables in Neon. Visit `/echo/admin` and create a project as normal.
+
+> Neon's free tier covers small-to-medium feedback volume. For high throughput, scale up Neon's plan or move to a self-hosted Postgres / RDS instance — the connection string is the only thing that changes.
+
+### Option D — Echo Cloud (managed-by-us, coming soon)
+
+We're working on a hosted offering where the database and Echo host are managed for you. Sign up for the waitlist at <https://amiracle.net/echo> (TBD). Until that lands, options A–C all work today.
 
 ---
 
@@ -406,4 +431,4 @@ See [ROADMAP.md](ROADMAP.md) for the full list.
 
 ## License
 
-MIT — see [LICENSE](LICENSE) (TBD; file to be added).
+MIT — see [LICENSE](LICENSE).

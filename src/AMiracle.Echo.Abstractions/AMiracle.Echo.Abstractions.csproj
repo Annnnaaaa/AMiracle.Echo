@@ -1,12 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageId>AMiracle.Echo.Abstractions</PackageId>
-    <Description>Abstractions and DTOs for AMiracle.Echo feedback collection.</Description>
+    <Description>Core interfaces (IFeedbackStore, IBlobStore, IFeedbackProcessor) and DTOs for AMiracle.Echo. Implement these to plug in custom storage, blob backends, or pre-persistence processors. Does not depend on EF Core or ASP.NET Core.</Description>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
 
 </Project>

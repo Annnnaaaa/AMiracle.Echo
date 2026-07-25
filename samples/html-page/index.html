@@ -1,0 +1,72 @@
+<!doctype html>
+<!--
+  Minimal AMiracle.Echo widget integration.
+
+  How to use:
+  1. Start the Echo host on http://localhost:5000.
+  2. Create a project in /echo/admin with "http://localhost:8000" in Allowed Origins.
+  3. Replace data-project-id + data-public-key below with your project's values.
+  4. Serve this folder on port 8000, e.g.:
+        python -m http.server 8000
+     or:
+        npx serve -l 8000 .
+  5. Open http://localhost:8000 → a floating bubble appears bottom-right → click it,
+     type something, click Send → it lands in /echo/admin.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Echo widget — demo page</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; line-height: 1.5; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+    pre  { background: #f3f4f6; padding: 12px; border-radius: 6px; overflow: auto; }
+    button { padding: 8px 14px; border-radius: 6px; border: 1px solid #d4d4d8; background: #fff; cursor: pointer; }
+    button.primary { background: #4f46e5; color: #fff; border: 0; }
+  </style>
+</head>
+<body>
+  <h1>AMiracle.Echo — demo host page</h1>
+  <p>This page does nothing useful. It exists to verify that the embeddable widget loads and submits to your local Echo backend.</p>
+
+  <h2>1. The floating bubble</h2>
+  <p>Look at the bottom-right corner — there should be a small purple chat bubble. Click it.</p>
+
+  <h2>2. Programmatic open</h2>
+  <p>You can also trigger the widget from your own UI:</p>
+  <p><button class="primary" onclick="AMiracleEcho.open()">Open feedback</button></p>
+
+  <h2>3. Attach identity + custom metadata</h2>
+  <p>Pre-fill the submitter so the widget doesn't ask:</p>
+  <p>
+    <button onclick="AMiracleEcho.identify({ id: 'demo-user-42', email: 'demo@example.com', name: 'Demo User' }); alert('Identified.');">Identify as demo user</button>
+    <button onclick="AMiracleEcho.setMetadata({ buildVersion: '1.2.3', env: 'demo', tier: 'free' }); alert('Metadata attached.');">Attach metadata</button>
+    <button onclick="AMiracleEcho.clearIdentity(); alert('Identity cleared.');">Clear identity</button>
+  </p>
+
+  <h2>4. Subscribe to events</h2>
+  <pre>AMiracleEcho.on("submitted", ({ id }) =&gt; console.log("Feedback submitted:", id));</pre>
+
+  <!--
+    EDIT THESE TWO ATTRIBUTES with the values from /echo/admin → your project → "Show widget snippet".
+    The values below will give a 401 — they're placeholders so the page renders.
+  -->
+  <script src="http://localhost:5000/echo/widget.js"
+          data-project-id="REPLACE-WITH-PROJECT-ID"
+          data-public-key="REPLACE-WITH-PUBLIC-KEY"
+          data-position="bottom-right"
+          defer></script>
+
+  <script>
+    // Wait until the widget API is ready, then wire the "submitted" event.
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.AMiracleEcho) {
+        AMiracleEcho.on("submitted", ({ id }) => {
+          console.log("Feedback submitted with id:", id);
+        });
+      }
+    });
+  </script>
+</body>
+</html>

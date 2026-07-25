@@ -1,26 +1,21 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <PackageId>AMiracle.Echo.Server</PackageId>
-    <Description>ASP.NET Core endpoints and services for AMiracle.Echo.</Description>
+    <Description>ASP.NET Core endpoints, services, ingestion pipeline, retention sweeper, embedded widget JS, and admin web page for AMiracle.Echo. Call AddAmiracleEcho() + MapAmiracleEcho() from your host's Program.cs to mount everything.</Description>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\AMiracle.Echo.Abstractions\AMiracle.Echo.Abstractions.csproj" />
+    <ProjectReference Include="..\AMiracle.Echo.Analysis.Abstractions\AMiracle.Echo.Analysis.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\admin.html" />
     <EmbeddedResource Include="Resources\widget.js" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\AMiracle.Echo.Analysis.Abstractions\AMiracle.Echo.Analysis.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

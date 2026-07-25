@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: mailto:help@amiracle.net
+    about: Do NOT open a public issue for security reports. Email help@amiracle.net — see SECURITY.md.
+  - name: Question / general discussion
+    url: https://github.com/Annnnaaaa/AMiracle.Echo/discussions
+    about: For usage questions, design feedback, and "is this the right tool for X" conversations.

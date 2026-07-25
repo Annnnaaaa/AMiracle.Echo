@@ -87,6 +87,22 @@ src/AMiracle.Echo.Host/smoketest.db
 src/AMiracle.Echo.Host/smoketest.db-*
 src/AMiracle.Echo.Host/echo-blobs/
 src/AMiracle.Echo.Host/smoketest-blobs/
+corstest.db*
+corstest-blobs/
+
+# Managed Echo Cloud control plane — private product code, not part of public OSS
+src/AMiracle.Echo.Cloud/
+src/AMiracle.Echo.Cloud.Host/
+
+# Cloud control-plane runtime artifacts (if folders exist locally)
+cloud.db
+cloud.db-*
+src/AMiracle.Echo.Cloud.Host/cloud.db
+src/AMiracle.Echo.Cloud.Host/cloud.db-*
+cloud.log
+cloud.err.log
+host.log
+host.err.log
 
 # Local secret overrides (don't commit admin tokens, connection strings, etc.)
 appsettings.local.json
@@ -100,3 +116,9 @@ src/**/appsettings.*.local.json
 # Logs
 *.log
 /tmp/
+
+# Build / pack artifacts (CI's output dir, local dotnet pack output)
+artifacts/
+TestResults/
+*.nupkg
+*.snupkg

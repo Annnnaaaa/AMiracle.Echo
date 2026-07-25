@@ -1,0 +1,48 @@
+<Project>
+  <!-- Shared metadata for all packages in the AMiracle.Echo solution. -->
+  <!-- Bump <Version> here to release everything as a group. -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <Authors>A Miracle</Authors>
+    <Company>A Miracle</Company>
+    <Product>AMiracle.Echo</Product>
+    <Copyright>Copyright (c) 2026 A Miracle</Copyright>
+
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591;NU1900</NoWarn>
+
+    <!-- NuGet package metadata (inherited by every csproj; individual projects override Description / Tags). -->
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Annnnaaaa/AMiracle.Echo</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Annnnaaaa/AMiracle.Echo</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>feedback;widget;voice;screenshot;analysis;ai;dotnet;aspnetcore;efcore;openai</PackageTags>
+    <PackageReleaseNotes>See https://github.com/Annnnaaaa/AMiracle.Echo/blob/main/CHANGELOG.md</PackageReleaseNotes>
+
+    <!-- SourceLink: step-into-source from a debugger. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <DebugType>portable</DebugType>
+
+    <!-- Deterministic builds in CI (reproducible binaries). -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- Default to NOT packable; opt in per project. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Every packable project gets the SourceLink package and the README. -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+</Project>

@@ -22,9 +22,19 @@
 - Triage workflow (assign, comment, link to GitHub/Linear issues).
 - Search, charts, exports.
 
+## Echo Cloud (managed offering — private)
+
+Paid hosted option we run for customers. **Not part of this OSS repo** (control-plane code stays private).
+
+**Direction:**
+- Signup / billing → provision managed database + admin access for paying plans.
+- Customers embed the widget against our shared Host URL (or later per-tenant Hosts).
+- Self-host remains free via this MIT repo + NuGet / Docker.
+
+**Still needed before launch:** Stripe checkout + verified webhooks, customer auth, marketing site, ToS/privacy, durable secrets, support.
+
 ## Future / community
 
 - Mongo `IFeedbackStore` adapter.
 - Native mobile SDKs (iOS / Android) if demand emerges. (Flutter already supported via WebView or REST.)
 - Translation packs (es, fr, de, ru, ...).
-- Hosted SaaS offering.

@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'           # e.g. v0.1.0, v1.2.3-rc.1
+
+jobs:
+  publish:
+    name: Pack & push to NuGet.org
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # attach .nupkg files to the GitHub Release
+      id-token: write      # GitHub OIDC → NuGet Trusted Publishing
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET 8 + .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Derive version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
+
+      - name: Restore
+        run: dotnet restore AMiracle.Echo.slnx
+
+      - name: Build (Release)
+        run: dotnet build AMiracle.Echo.slnx --configuration Release --no-restore -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Pack
+        run: dotnet pack AMiracle.Echo.slnx --configuration Release --no-build --output ./artifacts -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: List packages
+        run: ls -lh ./artifacts
+
+      - name: NuGet login (OIDC → temp API key)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          # nuget.org profile username (not email). Set under Settings → Secrets → Actions.
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to NuGet.org
+        run: |
+          if [ -z "${{ steps.login.outputs.NUGET_API_KEY }}" ]; then
+            echo "::error::Trusted Publishing login did not return an API key. Check nuget.org Trusted Publishing policy + NUGET_USER secret."
+            exit 1
+          fi
+          dotnet nuget push ./artifacts/*.nupkg \
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./artifacts/*.*nupkg
+          generate_release_notes: true
