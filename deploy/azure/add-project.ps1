@@ -8,6 +8,9 @@
 
 .EXAMPLE
     ./add-project.ps1 -Name "My App" -Origins https://myapp.com,http://localhost:5173
+.EXAMPLE
+    ./add-project.ps1 -Name "My Mobile App" -Origins app://com.company.myapp
+    Native apps send no Origin header on their own; the app must send this value as its Origin header.
 #>
 param(
     [Parameter(Mandatory)][string]$Name,
@@ -20,8 +23,8 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 
 $Origins = @($Origins | ForEach-Object { $_.Trim().TrimEnd('/') } | Where-Object { $_ })
-$bad = @($Origins | Where-Object { $_ -notmatch '^https?://[^/\s]+$' })
-if ($bad.Count -gt 0) { throw "Origins must look like https://myapp.com (scheme + host, no path). Invalid: $($bad -join ', ')" }
+$bad = @($Origins | Where-Object { $_ -notmatch '^[a-zA-Z][a-zA-Z0-9+.-]*://[^/\s]+$' })
+if ($bad.Count -gt 0) { throw "Origins must look like https://myapp.com or app://com.company.app (scheme + host, no path). Invalid: $($bad -join ', ')" }
 
 $app = (az containerapp show --resource-group $ResourceGroup --name $AppName -o json --only-show-errors) -join "`n" | ConvertFrom-Json -Depth 50
 $customHost = @($app.properties.configuration.ingress.customDomains | Where-Object { $_.bindingType -eq 'SniEnabled' }) | Select-Object -First 1
