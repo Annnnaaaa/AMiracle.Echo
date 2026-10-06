@@ -114,7 +114,25 @@ Everything below is clicks in a browser, except generating the admin token (one 
 
 > **Use [portal.azure.com](https://portal.azure.com) only.** Don't use the separate Container Apps site `containerapps.azure.com` — it creates **Express (preview)** apps, which don't support Azure Files storage or custom domains. Menu names below were checked against Microsoft Learn in October 2026.
 
-**Already created an Express app?** Delete the Container App and its Express environment (both in `rg-echo`), then start again at Step 3. Keep the storage account and file share. Nothing else is lost: data lives in Neon.
+**Already created an Express app?** Use the scripts below — they copy its secrets, then replace it. Or by hand: delete the Container App and its Express environment (both in `rg-echo`), then start again at Step 3. Keep the storage account and file share. Nothing else is lost: data lives in Neon.
+
+### Scripted path (replaces Steps 3–7)
+
+Portal → **Cloud Shell** icon (top bar) → choose **PowerShell**, then:
+
+```powershell
+iwr https://raw.githubusercontent.com/Annnnaaaa/AMiracle.Echo/main/deploy/azure/deploy.ps1 -OutFile deploy.ps1
+iwr https://raw.githubusercontent.com/Annnnaaaa/AMiracle.Echo/main/deploy/azure/add-domain.ps1 -OutFile add-domain.ps1
+./deploy.ps1 -Domain echo.<your-domain>
+```
+
+`deploy.ps1` reuses the admin token + Neon connection string from an existing `echo-host` app (prompts only if there is none), replaces an Express environment, creates the standard environment, connects the `echo-blobs` file share, creates the app, and prints the two DNS records. After adding them at your DNS provider:
+
+```powershell
+./add-domain.ps1 -Domain echo.<your-domain>
+```
+
+Both scripts are safe to re-run. Then continue with Step 8.
 
 ### What you need before starting
 

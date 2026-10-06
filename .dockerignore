@@ -5,6 +5,7 @@
 .idea/
 docs/
 samples/
+deploy/
 **/bin/
 **/obj/
 **/TestResults/
