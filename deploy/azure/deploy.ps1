@@ -10,13 +10,19 @@
     - Deletes that app and its environment if the environment is Express (asks first).
     - Creates a standard (workload profiles, Consumption) environment, mounts the Azure Files share,
       and creates the app (min 0 / max 1 replicas, external HTTPS ingress on port 8080).
+    - Creates a monthly cost budget with email alerts at 80% and 100% (skip with -SkipBudget).
     - Prints the DNS records for your custom domain. Then run add-domain.ps1.
 
 .EXAMPLE
     ./deploy.ps1 -Domain echo.example.com
+.EXAMPLE
+    ./deploy.ps1 -Domain echo.example.com -BudgetAmount 5 -AlertEmail me@example.com
 #>
 param(
     [string]$Domain,
+    [decimal]$BudgetAmount = 10,
+    [string]$AlertEmail,
+    [switch]$SkipBudget,
     [string]$ResourceGroup = 'rg-echo',
     [string]$AppName = 'echo-host',
     [string]$EnvironmentName = 'echo-env',
@@ -59,6 +65,43 @@ function Get-AppSetting($App, $Secrets, [string]$EnvVarName, [string]$FallbackSe
     ($Secrets | Where-Object { $_.name -eq $secretName } | Select-Object -First 1).value
 }
 
+function Set-MonthlyBudget([decimal]$Amount, [string]$Email) {
+    $account = Invoke-AzJson account show
+    if (-not $Email) { $Email = $account.user.name }
+    if ($Email -notmatch '@') {
+        Write-Host "  Skipped: couldn't find your email. Re-run with -AlertEmail you@example.com" -ForegroundColor Yellow
+        return
+    }
+    $url = "https://management.azure.com/subscriptions/$($account.id)/providers/Microsoft.Consumption/budgets/echo-monthly?api-version=2023-05-01"
+    if (Invoke-AzTryJson rest --method get --url $url) {
+        Write-Host '  Budget "echo-monthly" already exists - left unchanged.'
+        return
+    }
+    $notification = { param($threshold) @{ enabled = $true; operator = 'GreaterThanOrEqualTo'; threshold = $threshold; thresholdType = 'Actual'; contactEmails = @($Email) } }
+    $body = @{
+        properties = @{
+            category      = 'Cost'
+            amount        = $Amount
+            timeGrain     = 'Monthly'
+            timePeriod    = @{ startDate = ('{0:yyyy-MM}-01T00:00:00Z' -f (Get-Date).ToUniversalTime()) }
+            notifications = @{ actual80 = (& $notification 80); actual100 = (& $notification 100) }
+        }
+    } | ConvertTo-Json -Depth 10
+    $bodyPath = Join-Path ([IO.Path]::GetTempPath()) ("echo-budget-" + [guid]::NewGuid() + '.json')
+    try {
+        Set-Content -Path $bodyPath -Value $body -Encoding utf8NoBOM
+        $PSNativeCommandUseErrorActionPreference = $false
+        az rest --method put --url $url --body "@$bodyPath" --only-show-errors -o none
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  Budget `$$Amount/month created; alerts at 80% and 100% go to $Email" -ForegroundColor Green
+        } else {
+            Write-Host '  Budget could not be created (see error above). Create it in Portal: Cost Management > Budgets.' -ForegroundColor Yellow
+        }
+    } finally {
+        Remove-Item -Path $bodyPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Write-DnsInstructions($App, [string]$DomainName) {
     $fqdn = $App.properties.configuration.ingress.fqdn
     $verificationId = $App.properties.customDomainVerificationId
@@ -85,6 +128,11 @@ if (-not $rg) {
     Write-Step "Creating resource group $ResourceGroup"
     az group create --name $ResourceGroup --location $Location --only-show-errors -o none
     $rg = Invoke-AzJson group show --name $ResourceGroup
+}
+
+if (-not $SkipBudget) {
+    Write-Step 'Budget alert'
+    Set-MonthlyBudget $BudgetAmount $AlertEmail
 }
 
 $adminToken = $null

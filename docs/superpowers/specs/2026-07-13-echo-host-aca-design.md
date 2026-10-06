@@ -116,23 +116,25 @@ Everything below is clicks in a browser, except generating the admin token (one 
 
 **Already created an Express app?** Use the scripts below — they copy its secrets, then replace it. Or by hand: delete the Container App and its Express environment (both in `rg-echo`), then start again at Step 3. Keep the storage account and file share. Nothing else is lost: data lives in Neon.
 
-### Scripted path (replaces Steps 3–7)
+### Scripted path (replaces Steps 3–9)
 
 Portal → **Cloud Shell** icon (top bar) → choose **PowerShell**, then:
 
 ```powershell
 iwr https://raw.githubusercontent.com/Annnnaaaa/AMiracle.Echo/main/deploy/azure/deploy.ps1 -OutFile deploy.ps1
 iwr https://raw.githubusercontent.com/Annnnaaaa/AMiracle.Echo/main/deploy/azure/add-domain.ps1 -OutFile add-domain.ps1
+iwr https://raw.githubusercontent.com/Annnnaaaa/AMiracle.Echo/main/deploy/azure/add-project.ps1 -OutFile add-project.ps1
 ./deploy.ps1 -Domain echo.<your-domain>
 ```
 
-`deploy.ps1` reuses the admin token + Neon connection string from an existing `echo-host` app (prompts only if there is none), replaces an Express environment, creates the standard environment, connects the `echo-blobs` file share, creates the app, and prints the two DNS records. After adding them at your DNS provider:
+`deploy.ps1` creates a `$10/month` budget `echo-monthly` that emails your Azure sign-in address at 80% and 100% (change with `-BudgetAmount 5 -AlertEmail me@example.com`, skip with `-SkipBudget`), reuses the admin token + Neon connection string from an existing `echo-host` app (prompts only if there is none), replaces an Express environment, creates the standard environment, connects the `echo-blobs` file share, creates the app, and prints the two DNS records. After adding them at your DNS provider:
 
 ```powershell
 ./add-domain.ps1 -Domain echo.<your-domain>
+./add-project.ps1 -Name "My App" -Origins https://myapp.com,http://localhost:5173
 ```
 
-Both scripts are safe to re-run. Then continue with Step 8.
+`add-project.ps1` reads the admin token from the app's secrets, creates the project, and prints the `<script>` snippet to paste into your app. Run it once per app. All scripts are safe to re-run.
 
 ### What you need before starting
 
