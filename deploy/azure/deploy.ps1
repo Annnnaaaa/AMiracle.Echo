@@ -7,9 +7,10 @@
 
     - Reuses the admin token and Neon connection string from an existing app named -AppName
       (e.g. a previous Express deployment), so nothing has to be pasted. Prompts only if none exist.
-    - Deletes that app and its environment if the environment is Express (asks first).
-    - Creates a standard (workload profiles, Consumption) environment, mounts the Azure Files share,
-      and creates the app (min 0 / max 1 replicas, external HTTPS ingress on port 8080).
+    - Creates a standard (workload profiles, Consumption) environment and mounts the Azure Files share
+      BEFORE touching the old app; secrets are kept in ~/.echo-deploy-secrets.json until the new app exists.
+    - Replaces an Express app (asks first), creates the app (min 0 / max 1 replicas, external HTTPS
+      ingress on port 8080), then deletes the old Express environment.
     - Creates a monthly cost budget with email alerts at 80% and 100% (skip with -SkipBudget).
     - Prints the DNS records for your custom domain. Then run add-domain.ps1.
 
@@ -48,9 +49,7 @@ function Invoke-AzTryJson {
 }
 
 function Test-IsExpress($Resource) {
-    if (-not $Resource) { return $false }
-    if ("$($Resource.properties.environmentMode)" -eq 'Express') { return $true }
-    return (($Resource | ConvertTo-Json -Depth 50 -Compress) -match '"express"')
+    return [bool]$Resource -and "$($Resource.properties.environmentMode)" -eq 'Express'
 }
 
 function ConvertTo-YamlString([string]$Value) { "'" + $Value.Replace("'", "''") + "'" }
@@ -137,6 +136,9 @@ if (-not $SkipBudget) {
 
 $adminToken = $null
 $neonConn = $null
+$generatedToken = $false
+$oldEnvId = $null
+$backupPath = Join-Path $HOME '.echo-deploy-secrets.json'
 
 $existingApp = Invoke-AzTryJson containerapp show --resource-group $ResourceGroup --name $AppName
 if ($existingApp) {
@@ -150,6 +152,7 @@ if ($existingApp) {
         Write-DnsInstructions $existingApp $Domain
         return
     }
+    $oldEnvId = $existingEnvId
 
     Write-Step "Reading secrets from existing Express app '$AppName'"
     $secrets = Invoke-AzTryJson containerapp secret list --resource-group $ResourceGroup --name $AppName --show-values
@@ -159,42 +162,40 @@ if ($existingApp) {
     Write-Host ("  Neon connection:   " + $(if ($neonConn) { 'found' } else { 'NOT found' }))
 }
 
-if (-not $adminToken) { $adminToken = Read-Host 'Admin token (paste, input hidden)' -MaskInput }
+if ((-not $adminToken -or -not $neonConn) -and (Test-Path $backupPath)) {
+    $backup = Get-Content -Path $backupPath -Raw | ConvertFrom-Json
+    if (-not $adminToken) { $adminToken = $backup.adminToken }
+    if (-not $neonConn) { $neonConn = $backup.neonConn }
+    $generatedToken = $adminToken -eq $backup.adminToken -and [bool]$backup.generated
+    Write-Host "  Using secrets saved by a previous run ($backupPath)"
+}
+if (-not $adminToken) {
+    $adminToken = Read-Host 'Admin token (paste it, or press Enter to generate a new one)' -MaskInput
+    if (-not $adminToken) {
+        $adminToken = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant()
+        $generatedToken = $true
+    }
+}
 if (-not $neonConn) { $neonConn = Read-Host 'Neon .NET connection string (paste, input hidden)' -MaskInput }
-if (-not $adminToken -or -not $neonConn) { throw 'Admin token and Neon connection string are required.' }
+if (-not $neonConn) { throw 'The Neon connection string is required.' }
 if ($neonConn -notmatch 'Check Certificate Revocation') {
     $neonConn = $neonConn.TrimEnd(';', ' ') + ';Check Certificate Revocation=true'
 }
+@{ adminToken = $adminToken; neonConn = $neonConn; generated = $generatedToken } | ConvertTo-Json | Set-Content -Path $backupPath -Encoding utf8NoBOM
+if ($IsLinux) { chmod 600 $backupPath }
 
 if (-not $Location) { $Location = $rg.location }
 $Location = ($Location -replace '\s', '').ToLowerInvariant()
 
-if ($existingApp) {
-    $existingEnvName = ($existingEnvId -split '/')[-1]
-    Write-Host ''
-    Write-Host "About to DELETE container app '$AppName' and its Express environment '$existingEnvName'." -ForegroundColor Yellow
-    Write-Host 'Neon data, the storage account and the file share are NOT touched.'
-    if ((Read-Host "Type 'yes' to continue") -ne 'yes') { throw 'Cancelled.' }
-
-    Write-Step "Deleting app '$AppName'"
-    az containerapp delete --resource-group $ResourceGroup --name $AppName --yes --only-show-errors -o none
-    Write-Step "Deleting Express environment '$existingEnvName' (takes a few minutes)"
-    az resource delete --ids $existingEnvId --only-show-errors -o none
-}
-
 $envObj = Invoke-AzTryJson containerapp env show --resource-group $ResourceGroup --name $EnvironmentName
-if ($envObj -and (Test-IsExpress $envObj)) {
-    Write-Host "Environment '$EnvironmentName' is an Express environment and must be replaced." -ForegroundColor Yellow
-    if ((Read-Host "Type 'yes' to delete it") -ne 'yes') { throw 'Cancelled.' }
-    az resource delete --ids $envObj.id --only-show-errors -o none
-    $envObj = $null
-}
+if (Test-IsExpress $envObj) { throw "Environment '$EnvironmentName' is an Express environment. Re-run with -EnvironmentName <another-name>." }
 if (-not $envObj) {
     Write-Step "Creating standard environment '$EnvironmentName' in $Location (takes a few minutes)"
     az containerapp env create --resource-group $ResourceGroup --name $EnvironmentName --location $Location --logs-destination none --only-show-errors -o none
     $envObj = Invoke-AzJson containerapp env show --resource-group $ResourceGroup --name $EnvironmentName
+} else {
+    Write-Step "Using existing environment '$EnvironmentName'"
 }
-if (Test-IsExpress $envObj) { throw "Environment '$EnvironmentName' is still Express - aborting." }
 $useConsumptionProfile = [bool]($envObj.properties.workloadProfiles | Where-Object { $_.name -eq 'Consumption' })
 
 Write-Step 'Finding storage account and file share'
@@ -228,6 +229,15 @@ az containerapp env storage set --resource-group $ResourceGroup --name $Environm
     --azure-file-share-name $FileShareName `
     --access-mode ReadWrite `
     --only-show-errors -o none
+
+if ($existingApp) {
+    Write-Host ''
+    Write-Host "About to DELETE the Express container app '$AppName' and recreate it in '$EnvironmentName'." -ForegroundColor Yellow
+    Write-Host "Neon data, the storage account and the file share are NOT touched. Secrets are kept in $backupPath until the new app exists."
+    if ((Read-Host "Type 'yes' to continue") -ne 'yes') { throw 'Cancelled.' }
+    Write-Step "Deleting Express app '$AppName'"
+    az containerapp delete --resource-group $ResourceGroup --name $AppName --yes --only-show-errors -o none
+}
 
 Write-Step "Creating container app '$AppName'"
 $profileLine = if ($useConsumptionProfile) { '  workloadProfileName: Consumption' } else { '' }
@@ -279,8 +289,22 @@ try {
 } finally {
     Remove-Item -Path $yamlPath -Force -ErrorAction SilentlyContinue
 }
-
 $app = Invoke-AzJson containerapp show --resource-group $ResourceGroup --name $AppName
+Remove-Item -Path $backupPath -Force -ErrorAction SilentlyContinue
+
+if ($oldEnvId) {
+    Write-Step "Deleting old Express environment '$(($oldEnvId -split '/')[-1])' (takes a few minutes)"
+    $PSNativeCommandUseErrorActionPreference = $false
+    az resource delete --ids $oldEnvId --only-show-errors -o none
+    if ($LASTEXITCODE -ne 0) { Write-Host '  Could not delete it - delete it in Portal later (it costs nothing while empty).' -ForegroundColor Yellow }
+    $PSNativeCommandUseErrorActionPreference = $true
+}
+
+if ($generatedToken) {
+    Write-Host ''
+    Write-Host 'New admin token (save it in a password manager; also in Portal > app > Settings > Secrets > admin-token):' -ForegroundColor Yellow
+    Write-Host "  $adminToken"
+}
 $url = "https://$($app.properties.configuration.ingress.fqdn)/echo/admin"
 
 Write-Step 'Waiting for the app to answer (first start can take a minute)'
