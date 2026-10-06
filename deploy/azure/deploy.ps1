@@ -211,6 +211,12 @@ if (-not $envObj) {
     if (Test-IsExpress $envObj) { throw "Azure created '$EnvironmentName' as Express despite --environment-mode WorkloadProfiles. Your app was NOT touched." }
 } else {
     Write-Step "Using existing environment '$EnvironmentName'"
+    for ($i = 0; $i -lt 120 -and "$($envObj.properties.provisioningState)" -notin @('Succeeded', 'Failed', ''); $i++) {
+        if ($i -eq 0) { Write-Host "  still being created ($($envObj.properties.provisioningState)) - waiting..." }
+        Start-Sleep -Seconds 15
+        $envObj = Invoke-AzJson containerapp env show --resource-group $ResourceGroup --name $EnvironmentName
+    }
+    if ("$($envObj.properties.provisioningState)" -eq 'Failed') { throw "Environment '$EnvironmentName' failed to provision. Delete it in Portal and re-run." }
 }
 $useConsumptionProfile = [bool]($envObj.properties.workloadProfiles | Where-Object { $_.name -eq 'Consumption' })
 
