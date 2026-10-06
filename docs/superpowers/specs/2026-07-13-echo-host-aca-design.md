@@ -228,14 +228,15 @@ Container App → **Application → Scale** → **Edit and deploy** (or the Scal
 
 Skip only if you'll use text feedback only. Without this, audio/screenshot files vanish on every restart.
 
-1. Portal → **Storage accounts** → **+ Create**: resource group `rg-echo`, name e.g. `echostorage<random>`, same region, **Standard**, **LRS** → **Review + create** → **Create**.
-2. Storage account → **Data storage → File shares** → **+ File share** → name `echo-blobs` → **Create**.
-3. Storage account → **Security + networking → Access keys** → copy **key1**.
-4. Portal → **Container Apps Environments** → `echo-env` → **Settings → Azure Files** → **+ Add**:
-   - Name `echo-blobs`, storage account name, account key = key1, file share `echo-blobs`, access mode **Read/Write** → **Save**.
-5. Container App → **Application → Containers** → **Edit and deploy**:
+1. Portal → **Storage accounts** → **+ Create**: resource group `rg-echo`, name e.g. `echostorage<random>`, same region, primary service **Azure Files**, performance **Standard**, billing **Pay-as-you-go** (cheapest at low volume), redundancy **LRS** → **Review + create** → **Create**.
+2. Storage account → **Data storage → Classic file shares** → **+ File share** → name `echo-blobs`, protocol **SMB** → **Create**.  
+   (Don't use the standalone "File share" resource — it's NFS-only and can't be mounted with an account key.)
+3. Storage account → **Security + networking → Access keys** → copy **Storage account name** and **key1**.
+4. Portal → **Container Apps Environments** → `echo-env` → **Settings → Volume mounts** → **+ Add** → **SMB**:
+   - Name `echo-blobs`, storage account name, storage account key = key1, file share `echo-blobs`, access mode **Read/Write** → **Add** → **Save** (top of page).
+5. Container App → **Application → Revisions and replicas** → **Create new revision**:
    - **Volumes** tab → **+ Add** → type **Azure file volume**, name `blobs`, file share `echo-blobs` → **Add**.
-   - Click the container → **Volume mounts** tab → **+ Add** → volume `blobs`, mount path `/data/blobs` → **Save**.
+   - **Container** tab → click the container → **Volume mounts** tab → **+ Add** → volume `blobs`, mount path `/data/blobs` → **Save**.
    - **Create**.
 
 ---
