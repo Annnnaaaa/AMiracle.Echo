@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using AMiracle.Echo.Analysis.OpenAI;
 using AMiracle.Echo.Server;
 using AMiracle.Echo.Storage.EFCore;
@@ -43,6 +44,32 @@ if (analysisEnabled && !string.IsNullOrWhiteSpace(openAIKey))
     builder.Services.AddEchoOpenAIAnalyzer(builder.Configuration.GetSection("AMiracle:Echo:Analysis:OpenAI"));
 }
 
+// Per-client-IP limits. Behind a reverse proxy (Azure Container Apps, App Service, k8s ingress) the real
+// client IP only reaches us if ASPNETCORE_FORWARDEDHEADERS_ENABLED=true (set in docker/Dockerfile).
+var ingestionPerMinute = builder.Configuration.GetValue("AMiracle:Echo:RateLimit:IngestionPerMinute", 30);
+var adminPerMinute = builder.Configuration.GetValue("AMiracle:Echo:RateLimit:AdminPerMinute", 600);
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+    {
+        var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (ctx.Request.Path.StartsWithSegments("/api/v1/feedbacks"))
+            return RateLimitPartition.GetFixedWindowLimiter("ingest:" + ip, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = ingestionPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+            });
+        if (ctx.Request.Path.StartsWithSegments("/api/v1/admin"))
+            return RateLimitPartition.GetFixedWindowLimiter("admin:" + ip, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = adminPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+            });
+        return RateLimitPartition.GetNoLimiter("unlimited");
+    });
+});
+
 var app = builder.Build();
 
 // Apply migrations / ensure created on startup (good enough for v1; we don't ship migrations yet).
@@ -71,6 +98,8 @@ app.Use(async (ctx, next) =>
     }
     await next();
 });
+
+app.UseRateLimiter();
 
 app.MapAmiracleEcho();
 app.MapGet("/", () => Results.Redirect("/echo/admin"));

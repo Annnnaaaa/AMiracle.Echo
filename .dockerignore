@@ -1,0 +1,26 @@
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+docs/
+samples/
+**/bin/
+**/obj/
+**/TestResults/
+artifacts/
+
+# Private managed-offering code
+src/AMiracle.Echo.Cloud/
+src/AMiracle.Echo.Cloud.Host/
+
+# Local runtime data and secrets
+**/*.db
+**/*.db-*
+**/echo-blobs/
+**/smoketest-blobs/
+**/appsettings.local.json
+**/appsettings.*.local.json
+**/*.secrets.json
+**/.env
+**/*.log

@@ -10,6 +10,7 @@ WORKDIR /app
 COPY --from=build /app .
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 ENV AMiracle__Echo__BlobStore__RootPath=/data/blobs
 ENV AMiracle__Echo__Database__ConnectionString="Data Source=/data/echo.db"
 VOLUME ["/data"]
