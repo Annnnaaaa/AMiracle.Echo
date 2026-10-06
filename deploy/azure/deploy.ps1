@@ -188,11 +188,27 @@ if (-not $Location) { $Location = $rg.location }
 $Location = ($Location -replace '\s', '').ToLowerInvariant()
 
 $envObj = Invoke-AzTryJson containerapp env show --resource-group $ResourceGroup --name $EnvironmentName
-if (Test-IsExpress $envObj) { throw "Environment '$EnvironmentName' is an Express environment. Re-run with -EnvironmentName <another-name>." }
+if (Test-IsExpress $envObj) {
+    if ($oldEnvId -and $envObj.id -eq $oldEnvId) {
+        throw "Environment '$EnvironmentName' is the Express environment of '$AppName'. Re-run with -EnvironmentName <another-name>."
+    }
+    $appsInEnv = @(Invoke-AzJson containerapp list --resource-group $ResourceGroup | Where-Object {
+        "$($_.properties.environmentId)$($_.properties.managedEnvironmentId)" -eq $envObj.id })
+    if ($appsInEnv.Count -gt 0) {
+        throw "Environment '$EnvironmentName' is Express and still has apps ($($appsInEnv.name -join ', ')). Re-run with -EnvironmentName <another-name>."
+    }
+    Write-Host "Environment '$EnvironmentName' is an empty Express environment and must be replaced by a standard one." -ForegroundColor Yellow
+    if ((Read-Host "Type 'yes' to delete it") -ne 'yes') { throw 'Cancelled.' }
+    Write-Step "Deleting Express environment '$EnvironmentName' (takes a few minutes)"
+    az resource delete --ids $envObj.id --only-show-errors -o none
+    $envObj = $null
+}
 if (-not $envObj) {
     Write-Step "Creating standard environment '$EnvironmentName' in $Location (takes a few minutes)"
-    az containerapp env create --resource-group $ResourceGroup --name $EnvironmentName --location $Location --logs-destination none --only-show-errors -o none
+    az containerapp env create --resource-group $ResourceGroup --name $EnvironmentName --location $Location `
+        --environment-mode WorkloadProfiles --logs-destination none --only-show-errors -o none
     $envObj = Invoke-AzJson containerapp env show --resource-group $ResourceGroup --name $EnvironmentName
+    if (Test-IsExpress $envObj) { throw "Azure created '$EnvironmentName' as Express despite --environment-mode WorkloadProfiles. Your app was NOT touched." }
 } else {
     Write-Step "Using existing environment '$EnvironmentName'"
 }
