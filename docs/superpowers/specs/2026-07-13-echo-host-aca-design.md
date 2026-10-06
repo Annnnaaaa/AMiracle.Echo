@@ -161,7 +161,9 @@ Portal → search **Container Apps** → **+ Create** → **Container App**.
 | Container app name | `echo-host` |
 | Deployment source | **Container image** |
 | Region | closest to Neon |
-| Container Apps environment | **Create new** → name `echo-env`, plan **Consumption only** (no zone redundancy) |
+| Container Apps environment | **Create new** → name `echo-env`. Keep the default **Consumption** workload profile; don't add Dedicated profiles, no zone redundancy, default networking. |
+
+> **Do not use an "Express" environment/app** (preview option in the newer Portal flow). Express doesn't support Azure Files storage or custom domains, both of which this runbook needs. A standard environment shows a **Workload profiles** tab while creating it, and **Volume mounts** + **Custom domains** under its Settings afterwards.
 
 **Container tab**
 
