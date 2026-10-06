@@ -117,12 +117,13 @@ Same admin URL: <http://localhost:8080/echo/admin>.
 Want a real Postgres for production / shared dev without standing up your own server? [Neon](https://neon.tech) is serverless Postgres with a generous free tier and an HTTPS-only connection string. Echo runs against it out of the box.
 
 1. **Sign up at <https://neon.tech>** and create a new project (any region close to your Echo host).
-2. In the Neon dashboard, copy the **connection string** for the `Direct connection / .NET` view. It looks like
-   `Host=ep-something.eu-central-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=...;SSL Mode=Require;Trust Server Certificate=true`
+2. In the Neon dashboard, copy the **connection string** for the `.NET` view and append `Check Certificate Revocation=true`. It looks like
+   `Host=ep-something.eu-central-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=...;SSL Mode=VerifyFull;Channel Binding=Require;Check Certificate Revocation=true`
+   (In Linux containers, `SSL Mode=VerifyFull` without `Check Certificate Revocation=true` fails with "The remote certificate was rejected by the provided RemoteCertificateValidationCallback".)
 3. Set it on the Echo host:
    ```powershell
    $env:AMiracle__Echo__Database__Provider = "postgres"
-   $env:AMiracle__Echo__Database__ConnectionString = "Host=ep-...neon.tech;Database=neondb;Username=...;Password=...;SSL Mode=Require;Trust Server Certificate=true"
+   $env:AMiracle__Echo__Database__ConnectionString = "Host=ep-...neon.tech;Database=neondb;Username=...;Password=...;SSL Mode=VerifyFull;Channel Binding=Require;Check Certificate Revocation=true"
    $env:AMiracle__Echo__AdminToken = "your-32-byte-token"
    dotnet run --project src/AMiracle.Echo.Host --no-launch-profile
    ```

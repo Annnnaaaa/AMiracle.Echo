@@ -115,9 +115,9 @@ Everything below is clicks in a browser, except generating the admin token (one 
 ### What you need before starting
 
 - Azure for Students subscription ([portal.azure.com](https://portal.azure.com))
-- Neon connection string in .NET format:  
-  `Host=ep-xxx.<region>.aws.neon.tech;Database=neondb;Username=...;Password=...;SSL Mode=Require;Trust Server Certificate=true`  
-  (Neon dashboard → **Connect** → choose **.NET**.)
+- Neon connection string in .NET format (Neon dashboard → **Connect** → choose **.NET**), with `Check Certificate Revocation=true` appended:  
+  `Host=ep-xxx.<region>.aws.neon.tech;Database=neondb;Username=...;Password=...;SSL Mode=VerifyFull;Channel Binding=Require;Check Certificate Revocation=true`  
+  Without that last option, the Linux container rejects Neon's Let's Encrypt certificate ("The remote certificate was rejected by the provided RemoteCertificateValidationCallback").
 - Access to your domain's DNS settings (where you bought the domain, or Cloudflare)
 - Note the Neon region (e.g. `aws-eu-central-1` = Frankfurt) — pick the closest Azure region (Frankfurt → **Germany West Central**, or **West Europe**)
 
