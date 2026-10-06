@@ -114,7 +114,7 @@ Everything below is clicks in a browser, except generating the admin token (one 
 
 > **Use [portal.azure.com](https://portal.azure.com) only.** Don't use the separate Container Apps site `containerapps.azure.com` — it creates **Express (preview)** apps, which don't support Azure Files storage or custom domains. Menu names below were checked against Microsoft Learn in October 2026.
 
-**Already created an Express app?** Use the scripts below — they copy its secrets, then replace it. Or by hand: delete the Container App and its Express environment (both in `rg-echo`), then start again at Step 3. Keep the storage account and file share. Nothing else is lost: data lives in Neon.
+**Already created an Express app?** Use the scripts below — they copy its secrets, then replace it. Or by hand: delete the Container App and its Express environment (both in `AMiracle`), then start again at Step 3. Keep the storage account and file share. Nothing else is lost: data lives in Neon.
 
 ### Scripted path (replaces Steps 3–9)
 
@@ -181,7 +181,7 @@ portal.azure.com → search **Container Apps** → **Create** → **Container Ap
 | Field | Value |
 |---|---|
 | Subscription | Azure for Students |
-| Resource group | `rg-echo` (**Create new** if it doesn't exist) |
+| Resource group | `AMiracle` (**Create new** if it doesn't exist) |
 | Container app name | `echo-host` |
 | Optimize for Azure Functions | **unchecked** |
 | Deployment source | **Container image** |
@@ -258,7 +258,7 @@ Container App → **Application → Scale** → **Edit and deploy** → **Scale*
 
 Skip only if you'll use text feedback only. Without this, audio/screenshot files vanish on every restart.
 
-1. Portal → **Storage accounts** → **+ Create**: resource group `rg-echo`, name e.g. `echostorage<random>`, same region, primary service **Azure Files**, performance **Standard**, billing **Pay-as-you-go** (cheapest at low volume), redundancy **LRS** → **Review + create** → **Create**.
+1. Portal → **Storage accounts** → **+ Create**: resource group `AMiracle`, name e.g. `echostorage<random>`, same region, primary service **Azure Files**, performance **Standard**, billing **Pay-as-you-go** (cheapest at low volume), redundancy **LRS** → **Review + create** → **Create**.
 2. Storage account → **Data storage → Classic file shares** → **+ File share** → name `echo-blobs`, protocol **SMB** → **Create**.  
    (Don't use the standalone "File share" resource — it's NFS-only and can't be mounted with an account key.)
 3. Storage account → **Security + networking → Access keys** → copy **Storage account name** and **key1**.

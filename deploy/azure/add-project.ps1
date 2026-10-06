@@ -12,7 +12,7 @@
 param(
     [Parameter(Mandatory)][string]$Name,
     [Parameter(Mandatory)][string[]]$Origins,
-    [string]$ResourceGroup = 'rg-echo',
+    [string]$ResourceGroup = 'AMiracle',
     [string]$AppName = 'echo-host'
 )
 

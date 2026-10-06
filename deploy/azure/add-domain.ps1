@@ -11,7 +11,7 @@
 #>
 param(
     [Parameter(Mandatory)][string]$Domain,
-    [string]$ResourceGroup = 'rg-echo',
+    [string]$ResourceGroup = 'AMiracle',
     [string]$AppName = 'echo-host',
     [string]$EnvironmentName = 'echo-env'
 )

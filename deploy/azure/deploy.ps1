@@ -23,7 +23,7 @@ param(
     [decimal]$BudgetAmount = 10,
     [string]$AlertEmail,
     [switch]$SkipBudget,
-    [string]$ResourceGroup = 'rg-echo',
+    [string]$ResourceGroup = 'AMiracle',
     [string]$AppName = 'echo-host',
     [string]$EnvironmentName = 'echo-env',
     [string]$Image = 'ghcr.io/annnnaaaa/amiracle-echo:latest',
