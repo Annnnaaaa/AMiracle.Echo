@@ -112,6 +112,10 @@ The image contains no secrets: they live only in ACA secrets. `.dockerignore` ke
 
 Everything below is clicks in a browser, except generating the admin token (one PowerShell line).
 
+> **Use [portal.azure.com](https://portal.azure.com) only.** Don't use the separate Container Apps site `containerapps.azure.com` — it creates **Express (preview)** apps, which don't support Azure Files storage or custom domains. Menu names below were checked against Microsoft Learn in October 2026.
+
+**Already created an Express app?** Delete the Container App and its Express environment (both in `rg-echo`), then start again at Step 3. Keep the storage account and file share. Nothing else is lost: data lives in Neon.
+
 ### What you need before starting
 
 - Azure for Students subscription ([portal.azure.com](https://portal.azure.com))
@@ -129,8 +133,8 @@ The workflow `.github/workflows/docker.yml` builds and pushes the image on every
 
 1. GitHub → repo → **Actions** → **Docker image** → latest run is green.  
    (No run yet? Click **Run workflow** → **Run workflow**.)
-2. GitHub → your profile → **Packages** → `amiracle-echo` → **Package settings** → **Danger Zone** → **Change visibility** → **Public**.  
-   Public is fine: the source is already MIT, and the image contains no secrets. It lets Azure pull without a password.
+2. The package must be **Public** so Azure can pull without a password. It already is (it inherited the public repo's visibility). If it ever shows Private: GitHub → your profile → **Packages** → `amiracle-echo` → **Package settings** → **Danger Zone** → **Change visibility** → **Public**.  
+   Public is fine: the source is already MIT, and the image contains no secrets.
 
 Image name to use in Azure: `ghcr.io/<github-owner-lowercase>/amiracle-echo:latest`
 
@@ -150,15 +154,16 @@ Save the output in a password manager. You'll paste it into Azure (Step 4) and i
 
 ### Step 3 — Create the Container App
 
-Portal → search **Container Apps** → **+ Create** → **Container App**.
+portal.azure.com → search **Container Apps** → **Create** → **Container App**.
 
 **Basics tab**
 
 | Field | Value |
 |---|---|
 | Subscription | Azure for Students |
-| Resource group | **Create new** → `rg-echo` |
+| Resource group | `rg-echo` (**Create new** if it doesn't exist) |
 | Container app name | `echo-host` |
+| Optimize for Azure Functions | **unchecked** |
 | Deployment source | **Container image** |
 | Region | closest to Neon |
 | Container Apps environment | **Create new** → name `echo-env`. Keep the default **Consumption** workload profile; don't add Dedicated profiles, no zone redundancy, default networking. |
@@ -175,6 +180,7 @@ Portal → search **Container Apps** → **+ Create** → **Container App**.
 | Image type | **Public** |
 | Registry login server | `ghcr.io` |
 | Image and tag | `<github-owner-lowercase>/amiracle-echo:latest` |
+| Workload profile | **Consumption** |
 | CPU and Memory | **0.25 CPU cores, 0.5 Gi memory** |
 | Environment variables | leave empty for now |
 
@@ -196,10 +202,10 @@ On **Overview**, open the **Application Url** and add `/echo/admin`. The admin p
 
 ### Step 4 — Add secrets and point the app at Neon
 
-1. Container App → **Settings → Secrets** → **+ Add**:
+1. Container App → **Security → Secrets** → **+ Add**:
    - Key `admin-token`, Type **Container Apps Secret**, Value = token from Step 2 → **Add**
    - Key `neon-conn`, Type **Container Apps Secret**, Value = Neon .NET connection string → **Add**
-2. Container App → **Application → Containers** → **Edit and deploy** → click the container `echo-host` → **Environment variables** tab → add:
+2. Container App → **Application → Containers** → **Edit and deploy** → click the container `echo-host` → in the edit pane, scroll to **Environment variables** → add:
 
 | Name | Source | Value |
 |---|---|---|
@@ -209,13 +215,15 @@ On **Overview**, open the **Application Url** and add `/echo/admin`. The admin p
 
 3. **Save** → **Create** (this creates a new revision).
 
+Changing a secret's value **later** does not create a revision; the app keeps the old value until you go to **Application → Revisions and replicas** → active revision → **Restart** (or **Create new revision** → **Create**).
+
 Check: Container App → **Monitoring → Log stream** shows the app starting without errors. In Neon → **Tables**, you should now see `projects`, `feedbacks`, `feedback_comments`.
 
 ---
 
 ### Step 5 — Scale settings
 
-Container App → **Application → Scale** → **Edit and deploy** (or the Scale tab inside Edit and deploy):
+Container App → **Application → Scale** → **Edit and deploy** → **Scale** tab:
 
 | Setting | Value | Why |
 |---|---|---|
@@ -245,13 +253,17 @@ Skip only if you'll use text feedback only. Without this, audio/screenshot files
 
 ### Step 7 — Custom domain + free HTTPS certificate
 
-1. Container App → **Settings → Custom domains** → **+ Add custom domain** → **Managed certificate**.
-2. Domain: `echo.<your-domain>`. Azure shows two DNS records to create:
+1. Container App → **Networking → Custom domains** → **Add custom domain** → TLS/SSL certificate: **Managed certificate**.
+2. Domain: `echo.<your-domain>`. Hostname record type: **CNAME** (it's a subdomain). Azure shows two DNS records to create:
    - **CNAME**: host `echo` → value `<app>.<random>.<region>.azurecontainerapps.io`
    - **TXT**: host `asuid.echo` → value (a long verification string)
-3. At your DNS provider, add both records exactly as shown. If you use Cloudflare, set the CNAME to **DNS only** (grey cloud), not proxied.
-4. Back in Azure → **Validate** → **Add**. The certificate is issued automatically (5–20 minutes).
+3. At your DNS provider, add both records exactly as shown.
+   - Cloudflare: set the CNAME to **DNS only** (grey cloud). Proxied (orange cloud) blocks the free certificate.
+   - If your domain has any **CAA** record, add one more: CAA `0 issue "digicert.com"` on the root domain. (No CAA records at all = nothing to do.)
+4. Back in Azure → **Validate** → **Add**. The certificate is issued automatically (several minutes).
 5. When status is **Secured**, open `https://echo.<your-domain>/echo/admin`.
+
+The free certificate renews automatically as long as the app isn't **Stopped** (scaling to zero is fine) and the DNS records stay in place.
 
 ---
 
@@ -276,7 +288,9 @@ Repeat Step 8 for each app (one project per app).
 
 ### Step 9 — Budget alert (protects your student credit)
 
-Portal → **Cost Management + Billing** → **Budgets** → **+ Add**: scope = your subscription, amount e.g. `$10/month`, alert at 80% to your email.
+Azure for Students can't overspend: when the credit runs out, the subscription is disabled unless you upgrade it. An alert still tells you early.
+
+Portal → **Cost Management + Billing** → **Budgets** → **+ Add**: scope = your subscription, amount e.g. `$10/month`, alert at 80% to your email. (If Budgets isn't offered for your subscription, check remaining credit in the **Education** hub instead.)
 
 ---
 
@@ -285,7 +299,7 @@ Portal → **Cost Management + Billing** → **Budgets** → **+ Add**: scope = 
 1. Push to `main` on GitHub → wait for **Docker image** workflow to go green.
 2. Container App → **Application → Revisions and replicas** → **Create new revision** → **Create** (re-pulls `:latest`).
 
-Rotating the admin token: **Secrets** → edit `admin-token` → then **Revisions and replicas** → restart the active revision.
+Rotating the admin token: **Security → Secrets** → edit `admin-token` → then **Revisions and replicas** → restart the active revision.
 
 ---
 
