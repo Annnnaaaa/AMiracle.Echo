@@ -50,7 +50,7 @@ public sealed class OpenAIFeedbackAnalyzer : IFeedbackAnalyzer
                 await using var audio = await context.OpenAudioBlob(feedback.AudioBlobKey, ct);
                 if (audio is not null)
                 {
-                    result.Transcript = await TranscribeAsync(audio, ct);
+                    result.Transcript = await TranscribeAsync(audio, Path.GetExtension(feedback.AudioBlobKey), ct);
                 }
             }
             catch (Exception ex)
@@ -84,12 +84,23 @@ public sealed class OpenAIFeedbackAnalyzer : IFeedbackAnalyzer
         return result;
     }
 
-    private async Task<string?> TranscribeAsync(Stream audio, CancellationToken ct)
+    private async Task<string?> TranscribeAsync(Stream audio, string? extension, CancellationToken ct)
     {
+        // The API infers the container from the file name, so pass the real one: browsers record
+        // webm/ogg, phones record m4a. The blob key carries the extension chosen at upload time.
+        var (ext, mime) = extension?.ToLowerInvariant() switch
+        {
+            ".m4a" => (".m4a", "audio/mp4"),
+            ".mp3" => (".mp3", "audio/mpeg"),
+            ".ogg" => (".ogg", "audio/ogg"),
+            ".wav" => (".wav", "audio/wav"),
+            ".flac" => (".flac", "audio/flac"),
+            _ => (".webm", "audio/webm"),
+        };
         using var form = new MultipartFormDataContent();
         var audioContent = new StreamContent(audio);
-        audioContent.Headers.ContentType = new MediaTypeHeaderValue("audio/webm"); // OpenAI accepts most container types
-        form.Add(audioContent, "file", "audio.webm");
+        audioContent.Headers.ContentType = new MediaTypeHeaderValue(mime);
+        form.Add(audioContent, "file", "audio" + ext);
         form.Add(new StringContent(_opts.TranscriptionModel), "model");
 
         using var resp = await _http.PostAsync("audio/transcriptions", form, ct);

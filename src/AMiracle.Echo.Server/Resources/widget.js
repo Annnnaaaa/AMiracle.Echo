@@ -15,6 +15,11 @@
       shot: "Add screenshot",
       retake: "Retake",
       remove: "Remove",
+      highlight: "Highlight",
+      highlightHint: "Drag on the screenshot to mark an area",
+      undo: "Undo",
+      done: "Done",
+      cancel: "Cancel",
       send: "Send",
       sending: "Sending…",
       thanks: "Thanks!",
@@ -94,6 +99,13 @@
       display: grid; place-items: center; cursor: zoom-out;
     }
     .lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+    .annot {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2147483647;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    }
+    .annot canvas { max-width: 94vw; max-height: 80vh; border-radius: 6px; cursor: crosshair; touch-action: none; }
+    .annot .bar { display: flex; gap: 8px; align-items: center; color: #fff; font-size: 13px; flex-wrap: wrap; justify-content: center; }
+    .annot .btn { background: #fff; color: #18181b; }
     .label { font-size: 12px; opacity: .7; }
     input[type=email], select {
       width: 100%; padding: 6px 10px; border: 1px solid var(--echo-border, #d4d4d8); border-radius: 8px;
@@ -326,10 +338,12 @@
         <div class="thumb-row">
           <img class="thumb" src="${url}" alt="Screenshot preview" title="Click to enlarge">
           <span style="font-size:12px;opacity:.8">Screenshot attached</span>
+          <button class="btn" type="button" data-action="highlight-shot">${esc(this._strings.highlight)}</button>
           <button class="btn" type="button" data-action="remove-shot">${esc(this._strings.remove)}</button>
         </div>`;
       const thumb = this._shotPreview.querySelector(".thumb");
       thumb.addEventListener("click", () => this._openLightbox(url));
+      this._shotPreview.querySelector('[data-action="highlight-shot"]').addEventListener("click", () => this._openAnnotator());
       this._shotPreview.querySelector('[data-action="remove-shot"]').addEventListener("click", () => {
         this._screenshotBlob = null;
         this._shotPreview.hidden = true;
@@ -342,6 +356,81 @@
       box.className = "lightbox";
       box.innerHTML = `<img src="${url}" alt="Screenshot">`;
       box.addEventListener("click", () => box.remove());
+      this.shadowRoot.appendChild(box);
+    }
+
+    // Full-screen editor: drag to draw highlight boxes on the attached screenshot.
+    // "Done" bakes the boxes into the image that gets uploaded.
+    async _openAnnotator() {
+      const source = this._screenshotBlob;
+      if (!source) return;
+      let img;
+      try { img = await createImageBitmap(source); }
+      catch (e) { this._showError("This image can't be edited."); return; }
+
+      const box = document.createElement("div");
+      box.className = "annot";
+      box.innerHTML = `
+        <div class="bar">${esc(this._strings.highlightHint)}</div>
+        <canvas></canvas>
+        <div class="bar">
+          <button class="btn" type="button" data-a="undo">${esc(this._strings.undo)}</button>
+          <button class="btn" type="button" data-a="cancel">${esc(this._strings.cancel)}</button>
+          <button class="btn" type="button" data-a="done" style="background:var(--echo-primary,#4f46e5);color:#fff;border-color:transparent">${esc(this._strings.done)}</button>
+        </div>`;
+      const canvas = box.querySelector("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const g = canvas.getContext("2d");
+      const rects = [];
+      let drag = null;
+
+      const draw = () => {
+        g.drawImage(img, 0, 0);
+        g.lineWidth = Math.max(3, Math.round(canvas.width / 250));
+        g.strokeStyle = "#ef4444";
+        g.fillStyle = "rgba(250, 204, 21, 0.25)";
+        for (const r of drag ? rects.concat([drag]) : rects) {
+          g.fillRect(r.x, r.y, r.w, r.h);
+          g.strokeRect(r.x, r.y, r.w, r.h);
+        }
+      };
+      // Pointer position in image pixels (the canvas is displayed scaled down).
+      const at = (e) => {
+        const b = canvas.getBoundingClientRect();
+        return { x: (e.clientX - b.left) * canvas.width / b.width, y: (e.clientY - b.top) * canvas.height / b.height };
+      };
+      canvas.addEventListener("pointerdown", (e) => {
+        canvas.setPointerCapture(e.pointerId);
+        const p = at(e);
+        drag = { x: p.x, y: p.y, w: 0, h: 0 };
+      });
+      canvas.addEventListener("pointermove", (e) => {
+        if (!drag) return;
+        const p = at(e);
+        drag.w = p.x - drag.x;
+        drag.h = p.y - drag.y;
+        draw();
+      });
+      canvas.addEventListener("pointerup", () => {
+        if (drag && Math.abs(drag.w) > 4 && Math.abs(drag.h) > 4) rects.push(drag);
+        drag = null;
+        draw();
+      });
+
+      box.querySelector('[data-a="undo"]').addEventListener("click", () => { rects.pop(); draw(); });
+      box.querySelector('[data-a="cancel"]').addEventListener("click", () => box.remove());
+      box.querySelector('[data-a="done"]').addEventListener("click", () => {
+        if (!rects.length) { box.remove(); return; }
+        // Keep JPEG/WebP as-is so a photo-like screenshot doesn't balloon past the upload limit.
+        const type = source.type === "image/jpeg" || source.type === "image/webp" ? source.type : "image/png";
+        canvas.toBlob((blob) => {
+          if (blob) { this._screenshotBlob = blob; this._renderShotPreview(); }
+          box.remove();
+        }, type, 0.92);
+      });
+
+      draw();
       this.shadowRoot.appendChild(box);
     }
 

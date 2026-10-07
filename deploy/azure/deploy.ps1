@@ -10,7 +10,8 @@
     - Creates a standard (workload profiles, Consumption) environment and mounts the Azure Files share
       BEFORE touching the old app; secrets are kept in ~/.echo-deploy-secrets.json until the new app exists.
     - Replaces an Express app (asks first), creates the app (min 0 / max 1 replicas, external HTTPS
-      ingress on port 8080), then deletes the old Express environment.
+      ingress on port 8080), then deletes the old Express environment. Pass -MinReplicas 1 to keep
+      one replica warm and avoid the ~30s cold start on the first request after idle.
     - Creates a monthly cost budget with email alerts at 80% and 100% (skip with -SkipBudget).
     - Prints the DNS records for your custom domain. Then run add-domain.ps1.
 
@@ -29,7 +30,10 @@ param(
     [string]$EnvironmentName = 'echo-env',
     [string]$Image = 'ghcr.io/annnnaaaa/amiracle-echo:latest',
     [string]$FileShareName = 'echo-blobs',
-    [string]$Location
+    [string]$Location,
+    # 0 = scale to zero when idle (cheapest, but the first request after idle waits ~30s for a cold start).
+    # 1 = keep one replica warm (no cold start, billed at the idle rate around the clock).
+    [ValidateRange(0, 1)][int]$MinReplicas = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -297,7 +301,7 @@ $profileLine
           - volumeName: blobs
             mountPath: /data/blobs
     scale:
-      minReplicas: 0
+      minReplicas: $MinReplicas
       maxReplicas: 1
     volumes:
       - name: blobs

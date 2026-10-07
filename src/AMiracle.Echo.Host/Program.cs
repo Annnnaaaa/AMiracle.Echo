@@ -23,7 +23,9 @@ builder.Services.AddEchoEfCoreStorage(opts =>
         case "postgres":
         case "postgresql":
         case "npgsql":
-            opts.UseNpgsql(connectionString);
+            // Serverless Postgres (Neon) suspends when idle and drops pooled connections;
+            // retry so the first query after a wake-up doesn't surface as a 500.
+            opts.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure());
             break;
         case "sqlite":
         default:

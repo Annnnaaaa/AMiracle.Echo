@@ -496,6 +496,7 @@ function renderFeedbacksTable() {
       <td>${new Date(f.createdAt).toLocaleString()}</td>
       <td>${f.type}${f.type==='voice'&&f.audioBlobKey&&!String(f.audioBlobKey).startsWith('pending:') ? ' 🎤':''}${f.screenshotKey&&!String(f.screenshotKey).startsWith('pending:') ? ' 📎':''}</td>
       <td>${previewShort}${f.summary?'<div class="help-text" style="font-style:italic">summary by AI</div>':''}</td>
+      <td>${esc(f.submitter?.email || f.submitter?.name || f.submitter?.id || "")}</td>
       <td><span class="pill ${f.status}">${f.status}</span></td>
       <td>${priPill}</td>
       <td>${f.category ?? ""}</td>
@@ -503,7 +504,7 @@ function renderFeedbacksTable() {
     </tr>`;
   }).join("");
   root.innerHTML = `<table>
-    <thead><tr><th>When</th><th>Type</th><th>Text / Summary</th><th>Status</th><th>Priority</th><th>Category</th><th>Assignee</th></tr></thead>
+    <thead><tr><th>When</th><th>Type</th><th>Text / Summary</th><th>From</th><th>Status</th><th>Priority</th><th>Category</th><th>Assignee</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
   root.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => openFeedback(tr.dataset.id));
@@ -699,6 +700,7 @@ function renderFeedbackDetail(f, comments) {
     <div class="grid">
       ${analysisBar}
       <div><b>${esc(f.type)}</b> · ${new Date(f.createdAt).toLocaleString()}</div>
+      ${renderSubmitter(f.submitter)}
 
       ${f.summary ? `<div class="chart" style="margin:0"><h3 style="margin:0 0 4px 0">Summary</h3><div>${esc(f.summary)}</div></div>` : ""}
 
@@ -744,6 +746,16 @@ function renderFeedbackDetail(f, comments) {
         <pre>${esc(JSON.stringify({ submitter: f.submitter, customMetadata: f.customMetadata, pageUrl: f.pageUrl, userAgent: f.userAgent, consentText: f.consentText }, null, 2))}</pre>
       </details>
     </div>`;
+}
+
+function renderSubmitter(s) {
+  const parts = [];
+  if (s?.name) parts.push(esc(s.name));
+  if (s?.email) parts.push(`<a href="mailto:${esc(s.email)}">${esc(s.email)}</a>`);
+  if (s?.id) parts.push(`<span class="help-text">id ${esc(s.id)}</span>`);
+  return parts.length
+    ? `<div>From: ${parts.join(" · ")}</div>`
+    : `<div class="help-text">From: anonymous — no submitter name, email or id was sent with this feedback.</div>`;
 }
 
 // ===== Project dialog =====

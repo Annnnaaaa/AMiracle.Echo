@@ -165,12 +165,15 @@ internal static class IngestionEndpoints
             detail: detail,
             statusCode: status);
 
-    private static string GuessExt(string contentType) => contentType.ToLowerInvariant() switch
+    // Match on the media type only; parameters ("; codecs=opus") vary by client.
+    private static string GuessExt(string contentType) => contentType.Split(';')[0].Trim().ToLowerInvariant() switch
     {
-        "audio/webm" or "audio/webm;codecs=opus" => ".webm",
-        "audio/ogg" or "audio/ogg;codecs=opus" => ".ogg",
-        "audio/mp4" or "audio/m4a" => ".m4a",
-        "audio/mpeg" => ".mp3",
+        "audio/webm" => ".webm",
+        "audio/ogg" => ".ogg",
+        "audio/mp4" or "audio/m4a" or "audio/x-m4a" => ".m4a",
+        "audio/mpeg" or "audio/mp3" => ".mp3",
+        "audio/wav" or "audio/x-wav" => ".wav",
+        "audio/flac" => ".flac",
         "image/png" => ".png",
         "image/jpeg" => ".jpg",
         "image/webp" => ".webp",

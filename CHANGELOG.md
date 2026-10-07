@@ -5,6 +5,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- Widget: **Highlight** button on an attached screenshot — drag to draw boxes, Undo, Done bakes them into the uploaded image.
+- Admin: submitter shown in a **From** column and at the top of the feedback detail (email is a `mailto:` link); says so explicitly when no submitter was sent.
+- `deploy/azure/deploy.ps1`: `-MinReplicas` (0 or 1) to keep one replica warm and avoid the cold start after idle.
+
+### Fixed
+
+- Host: Postgres connections retry on transient failure, so the first query after a serverless database (Neon) wakes up no longer fails.
+- Audio uploads: content types with parameters (`audio/webm; codecs=opus`) and phone formats (`audio/x-m4a`, `audio/wav`, `audio/flac`) get the right file extension.
+- OpenAI analyzer: transcription is sent with the recording's real format instead of always claiming WebM.
+
 ## [0.1.0] - 2026-05-21
 
 Initial public release.
