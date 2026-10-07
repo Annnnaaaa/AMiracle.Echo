@@ -316,8 +316,10 @@ Portal → **Cost Management + Billing** → **Budgets** → **+ Add**: scope = 
 
 ### Updating to a new version later
 
-1. Push to `main` on GitHub → wait for **Docker image** workflow to go green.
-2. Container App → **Application → Revisions and replicas** → **Create new revision** → **Create** (re-pulls `:latest`).
+1. Push to `main` on GitHub → wait for **Docker image** workflow to go green. Each build is tagged `sha-<first 7 chars of the commit>` (e.g. `sha-a55b760`).
+2. Container App → **Application → Revisions and replicas** → **Create new revision** → **Container image** section: tick the `echo-host` container → **Edit** → set **Image and tag** to `amiracle-echo:sha-<commit>` (registry `ghcr.io`, image `annnnaaaa/amiracle-echo`) → **Save** → **Create**. **Create** stays disabled until something changes; an unchanged `:latest` is not re-pulled.
+
+   Cloud Shell equivalent: `az containerapp update -g AMiracle -n echo-host --image ghcr.io/annnnaaaa/amiracle-echo:sha-<commit>`. Roll back the same way with an older tag.
 
 Rotating the admin token: **Security → Secrets** → edit `admin-token` → then **Revisions and replicas** → restart the active revision.
 
