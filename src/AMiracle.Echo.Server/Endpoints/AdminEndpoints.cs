@@ -285,7 +285,7 @@ internal static class AdminEndpoints
         {
             FeedbackId = id,
             Author = ReplyCommentAuthor,
-            Body = $"Emailed {to}:\n\n{message}",
+            Body = FeedbackReply.RecordBody(to, message),
             CreatedAt = clock.GetUtcNow(),
         }, ct);
 

@@ -19,6 +19,14 @@ public sealed class EchoOptions
     /// </summary>
     public string IdentitySigningKey { get; set; } = "";
 
+    /// <summary>
+    /// Key for the receipt tokens returned when feedback is sent, which let an anonymous
+    /// submitter look their feedback up again. Defaults to a key derived from
+    /// <see cref="AdminToken"/>; set this so rotating the admin token doesn't invalidate
+    /// receipts users already hold. Changing it invalidates existing receipts.
+    /// </summary>
+    public string ReceiptSigningKey { get; set; } = "";
+
     /// <summary>Outgoing email, used to reply to submitters from the admin.</summary>
     public EmailOptions Email { get; set; } = new();
 }

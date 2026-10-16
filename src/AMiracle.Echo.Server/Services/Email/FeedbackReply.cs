@@ -29,6 +29,21 @@ internal static class FeedbackReply
         catch (FormatException) { return null; }
     }
 
+    // How a sent reply is recorded in the triage thread. The submitter-facing history
+    // reads replies back through TryReadRecord, so the two must stay in sync.
+    private const string RecordPrefix = "Emailed ";
+    private const string RecordSeparator = ":\n\n";
+
+    public static string RecordBody(string to, string message) => RecordPrefix + to + RecordSeparator + message;
+
+    /// <summary>The message of a recorded reply, without the recipient address.</summary>
+    public static string? TryReadRecord(string body)
+    {
+        if (!body.StartsWith(RecordPrefix, StringComparison.Ordinal)) return null;
+        var sep = body.IndexOf(RecordSeparator, StringComparison.Ordinal);
+        return sep < 0 ? null : body[(sep + RecordSeparator.Length)..];
+    }
+
     public static EchoEmailMessage Build(string to, string projectName, Feedback feedback, string message)
     {
         var subject = "Re: your feedback on " + OneLine(projectName, 120);

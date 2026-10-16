@@ -259,6 +259,10 @@ AMiracleEcho.clearIdentity();
 // Attach arbitrary context to every submission.
 AMiracleEcho.setMetadata({ buildVersion: "1.2.3", tier: "pro", env: "production" });
 
+// Show the user what they sent before, with status and replies (also reachable from
+// "My feedback" in the panel once there is something to show).
+AMiracleEcho.openHistory();
+
 // Language at runtime (re-renders an open widget in place).
 AMiracleEcho.setLocale("hy");
 
@@ -308,6 +312,18 @@ The admin then badges each submitter **verified**, **unverified** (no hash sent)
 hash itself is never stored, and a client can't mark itself verified — the server
 always sets that flag.
 
+### Feedback history
+
+Users can look back at what they sent, its status (**Received** → **In review** →
+**Resolved**) and any reply you emailed from the admin. Internal comments are never shown.
+
+- **Signed-in users** (a signed identity, above): everything they sent to the project,
+  on any device.
+- **Anonymous users:** each send returns a `receiptToken`. The widget keeps receipts in
+  the browser, so users see what they sent from that browser. Receipts are signed with
+  `AMiracle__Echo__ReceiptSigningKey` — set it, or they're derived from the admin token
+  and stop working if you rotate it.
+
 ### Mobile / Flutter
 
 The widget itself is web-only. For mobile apps:
@@ -327,9 +343,15 @@ Auth: `X-Echo-Project-Key: ekp_...` header + `Origin` header validated against p
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| `POST` | `/api/v1/feedbacks` | `{type, text?, pageUrl?, userAgent?, submitter?, customMetadata?, category?, consentText?, willUploadAudio?, willUploadScreenshot?}` | `201 {id, uploadAudioUrl?, uploadScreenshotUrl?}` |
+| `POST` | `/api/v1/feedbacks` | `{type, text?, pageUrl?, userAgent?, submitter?, customMetadata?, category?, consentText?, willUploadAudio?, willUploadScreenshot?}` | `201 {id, uploadAudioUrl?, uploadScreenshotUrl?, receiptToken}` |
 | `POST` | `/api/v1/feedbacks/{id}/audio` | binary (audio/*) | `204` |
 | `POST` | `/api/v1/feedbacks/{id}/screenshot` | binary (image/*) | `204` |
+| `POST` | `/api/v1/feedbacks/history` | `{submitter?: {id, hash}, receipts?: [{id, token}]}` (max 100 receipts) | `200 {identity: "verified"\|"invalid"\|"none", items: [{id, createdAt, type, status, category, text, hasAudio, hasScreenshot, replies: [{sentAt, message}]}]}` |
+
+`history` is a `POST` so receipts and identity hashes stay out of URLs and logs. A
+signed `submitter` returns everything that user sent to the project; each valid receipt
+returns that one feedback. Anything else — an unsigned id, a wrong token, another
+project's feedback — returns nothing.
 
 ### Admin (CLI, admin page, your backend)
 

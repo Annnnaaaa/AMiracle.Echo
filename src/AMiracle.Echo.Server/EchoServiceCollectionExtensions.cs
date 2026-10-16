@@ -34,6 +34,7 @@ public static class EchoServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<FeedbackIngestionService>();
         services.AddSingleton<IdentityVerifier>();
+        services.AddSingleton<ReceiptSigner>();
         services.AddHttpClient(ResendEmailSender.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
         // TryAdd: a host that registered its own IEchoEmailSender keeps it.
         services.TryAddSingleton<IEchoEmailSender>(sp =>

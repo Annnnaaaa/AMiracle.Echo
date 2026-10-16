@@ -34,12 +34,89 @@ internal static class IngestionEndpoints
         group.MapPost("/", CreateFeedback);
         group.MapPost("/{id:guid}/audio", UploadAudio);
         group.MapPost("/{id:guid}/screenshot", UploadScreenshot);
+        // POST rather than GET: the request carries receipt tokens and a signed identity,
+        // which must not end up in URLs, proxy logs or browser history.
+        group.MapPost("/history", GetHistory);
     }
+
+    private const int MaxHistoryItems = 100;
+
+    private static async Task<IResult> GetHistory(
+        HttpContext ctx,
+        IFeedbackStore store,
+        IdentityVerifier identity,
+        ReceiptSigner receipts,
+        CancellationToken ct)
+    {
+        var (project, errorResult) = await AuthenticateProjectAsync(ctx, store, ct);
+        if (errorResult is not null) return errorResult;
+
+        HistoryRequest? req;
+        try { req = await ctx.Request.ReadFromJsonAsync<HistoryRequest>(ct); }
+        catch (JsonException ex) { return Problem(StatusCodes.Status400BadRequest, "invalid-json", "Invalid JSON.", ex.Message); }
+        if (req is null) return Problem(StatusCodes.Status400BadRequest, "empty-body", "Empty body.", null);
+        if (req.Receipts is { Count: > MaxHistoryItems })
+            return Problem(StatusCodes.Status400BadRequest, "too-many-receipts", $"At most {MaxHistoryItems} receipts per request.", null);
+
+        var found = new Dictionary<Guid, Feedback>();
+
+        // A signed identity proves who the user is, so it unlocks everything they sent to
+        // this project. An unsigned id is only a claim and unlocks nothing.
+        var verified = identity.Evaluate(project!.Id, req.Submitter?.Id, req.Submitter?.Hash);
+        if (verified == true)
+        {
+            foreach (var fb in await store.FindBySubmitterIdAsync(req.Submitter!.Id!, ct))
+                if (fb.ProjectId == project.Id && fb.DeletedAt is null) found[fb.Id] = fb;
+        }
+
+        // A receipt proves this client sent that one feedback.
+        foreach (var r in req.Receipts ?? [])
+        {
+            if (found.ContainsKey(r.Id) || !receipts.IsValid(r.Id, r.Token)) continue;
+            var fb = await store.GetFeedbackAsync(r.Id, ct);
+            if (fb is not null && fb.ProjectId == project.Id && fb.DeletedAt is null) found[fb.Id] = fb;
+        }
+
+        var items = new List<object>();
+        foreach (var fb in found.Values.OrderByDescending(f => f.CreatedAt).Take(MaxHistoryItems))
+        {
+            // Only replies that were actually emailed to the submitter — internal triage
+            // comments stay internal.
+            var replies = (await store.ListCommentsAsync(fb.Id, ct))
+                .Where(c => c.Author == AdminEndpoints.ReplyCommentAuthor)
+                .Select(c => (c.CreatedAt, Message: Services.Email.FeedbackReply.TryReadRecord(c.Body)))
+                .Where(r => r.Message is not null)
+                .Select(r => new { sentAt = r.CreatedAt, message = r.Message })
+                .ToList();
+
+            items.Add(new
+            {
+                id = fb.Id,
+                createdAt = fb.CreatedAt,
+                type = fb.Type,
+                status = fb.Status,
+                category = fb.Category,
+                text = fb.Text,
+                hasAudio = HasBlob(fb.AudioBlobKey),
+                hasScreenshot = HasBlob(fb.ScreenshotKey),
+                replies,
+            });
+        }
+
+        return Results.Ok(new
+        {
+            identity = verified switch { true => "verified", false => "invalid", null => "none" },
+            items,
+        });
+    }
+
+    private static bool HasBlob(string? key) => !string.IsNullOrEmpty(key) && !key.StartsWith("pending:", StringComparison.Ordinal);
 
     private static async Task<IResult> CreateFeedback(
         HttpContext ctx,
         IFeedbackStore store,
         FeedbackIngestionService ingestion,
+        ReceiptSigner receipts,
         CancellationToken ct)
     {
         var (project, errorResult) = await AuthenticateProjectAsync(ctx, store, ct);
@@ -73,6 +150,8 @@ internal static class IngestionEndpoints
             id = fb.Id,
             uploadAudioUrl = fb.AudioBlobKey is not null ? $"/api/v1/feedbacks/{fb.Id}/audio" : null,
             uploadScreenshotUrl = fb.ScreenshotKey is not null ? $"/api/v1/feedbacks/{fb.Id}/screenshot" : null,
+            // Keep this to look the feedback up later via POST /api/v1/feedbacks/history.
+            receiptToken = receipts.Issue(fb.Id),
         });
     }
 
@@ -212,3 +291,7 @@ internal sealed class LengthLimitedStream : Stream
     public override void SetLength(long value) => throw new NotSupportedException();
     public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }
+
+public sealed record HistoryRequest(HistorySubmitter? Submitter, List<HistoryReceipt>? Receipts);
+public sealed record HistorySubmitter(string? Id, string? Hash);
+public sealed record HistoryReceipt(Guid Id, string? Token);

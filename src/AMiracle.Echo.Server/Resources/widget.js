@@ -50,6 +50,17 @@
       attachFailedAudio: "Your message was sent, but the voice note couldn't be uploaded.",
       attachFailedShot: "Your message was sent, but the screenshot couldn't be uploaded.",
       attachFailedBoth: "Your message was sent, but the attachments couldn't be uploaded.",
+      myFeedback: "My feedback",
+      back: "Back",
+      loading: "Loading…",
+      historyEmpty: "You haven't sent any feedback yet.",
+      historyFailed: "Couldn't load your feedback. Try again.",
+      statusNew: "Received",
+      statusTriaged: "In review",
+      statusResolved: "Resolved",
+      replyLabel: "Reply from the team",
+      voiceNote: "Voice note",
+      withScreenshot: "Screenshot",
     },
     hy: {
       title: "Ուղարկել կարծիք",
@@ -84,6 +95,17 @@
       attachFailedAudio: "Հաղորդագրությունն ուղարկվեց, բայց ձայնագրությունը չհաջողվեց վերբեռնել։",
       attachFailedShot: "Հաղորդագրությունն ուղարկվեց, բայց էկրանի նկարը չհաջողվեց վերբեռնել։",
       attachFailedBoth: "Հաղորդագրությունն ուղարկվեց, բայց կցված ֆայլերը չհաջողվեց վերբեռնել։",
+      myFeedback: "Իմ կարծիքները",
+      back: "Հետ",
+      loading: "Բեռնվում է…",
+      historyEmpty: "Դուք դեռ կարծիք չեք ուղարկել։",
+      historyFailed: "Չհաջողվեց բեռնել ձեր կարծիքները։ Փորձեք կրկին։",
+      statusNew: "Ստացված",
+      statusTriaged: "Դիտարկվում է",
+      statusResolved: "Լուծված",
+      replyLabel: "Թիմի պատասխանը",
+      voiceNote: "Ձայնային հաղորդագրություն",
+      withScreenshot: "Սքրինշոթ",
     },
     ru: {
       title: "Отправить отзыв",
@@ -118,6 +140,17 @@
       attachFailedAudio: "Сообщение отправлено, но голосовую запись загрузить не удалось.",
       attachFailedShot: "Сообщение отправлено, но скриншот загрузить не удалось.",
       attachFailedBoth: "Сообщение отправлено, но вложения загрузить не удалось.",
+      myFeedback: "Мои отзывы",
+      back: "Назад",
+      loading: "Загрузка…",
+      historyEmpty: "Вы ещё не отправляли отзывов.",
+      historyFailed: "Не удалось загрузить ваши отзывы. Попробуйте ещё раз.",
+      statusNew: "Получен",
+      statusTriaged: "На рассмотрении",
+      statusResolved: "Решён",
+      replyLabel: "Ответ команды",
+      voiceNote: "Голосовое сообщение",
+      withScreenshot: "Скриншот",
     },
   };
 
@@ -223,6 +256,19 @@
     .warn { color: #b45309; font-size: 13px; text-align: center; }
     .ok { color: #16a34a; font-size: 14px; text-align: center; padding: 8px 0; }
     .recording { animation: pulse 1.2s infinite; }
+    .header-actions { display: flex; align-items: center; gap: 2px; }
+    .linkbtn { background: transparent; border: 0; cursor: pointer; color: var(--echo-primary, #4f46e5); font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 6px; }
+    .linkbtn:hover { background: rgba(127,127,127,0.12); }
+    .hist-title { font-size: 16px; margin: 0; font-weight: 600; }
+    .js-hist { display: flex; flex-direction: column; gap: 8px; }
+    .hist-item { border: 1px solid var(--echo-border, #d4d4d8); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+    .hist-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; opacity: .85; }
+    .hist-text { font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+    .hist-reply { font-size: 13px; border-left: 3px solid var(--echo-primary, #4f46e5); padding-left: 8px; white-space: pre-wrap; word-break: break-word; }
+    .pill { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: #e5e7eb; color: #374151; white-space: nowrap; }
+    .pill-triaged { background: #fef3c7; color: #92400e; }
+    .pill-resolved { background: #dcfce7; color: #166534; }
+    .muted { font-size: 13px; opacity: .7; text-align: center; padding: 8px 0; }
     @keyframes pulse { 50% { opacity: .55; } }
 
     /* Theme: data-theme wins; "auto" (or no attribute) follows the OS. Host pages can
@@ -293,7 +339,10 @@
         <div class="panel ${this._position()}${this._open ? " open" : ""}" part="panel" role="dialog" aria-modal="true" aria-label="${esc(S.title)}" lang="${lang}">
           <div class="header">
             <h2>${esc(S.title)}</h2>
-            <button class="close" type="button" aria-label="${esc(S.close)}">${ICON_CLOSE}</button>
+            <div class="header-actions">
+              ${canShowHistory() ? `<button class="linkbtn js-history" type="button">${esc(S.myFeedback)}</button>` : ""}
+              <button class="close" type="button" aria-label="${esc(S.close)}">${ICON_CLOSE}</button>
+            </div>
           </div>
           <textarea aria-label="${esc(S.placeholder)}" placeholder="${esc(S.placeholder)}"></textarea>
 
@@ -356,6 +405,7 @@
       const bubble = this.shadowRoot.querySelector(".bubble");
       if (bubble) bubble.addEventListener("click", () => this._setOpen(!this._open));
       this.shadowRoot.querySelector(".close").addEventListener("click", () => this._setOpen(false));
+      this.shadowRoot.querySelector(".js-history")?.addEventListener("click", () => this._openHistory());
       this._micBtn.addEventListener("click", () => this._toggleRecording());
       // Capture and attach are separate choices: someone who already took a screenshot
       // should be able to send that file instead of capturing again.
@@ -732,6 +782,8 @@
         return;
       }
 
+      rememberReceipt(created.id, created.receiptToken);
+
       // The feedback exists from here on, so a failed attachment is a partial
       // success: say exactly what was lost instead of a blanket "Thanks!".
       const audioOk = hasAudio ? await this._uploadBlob(`${cfg.serverUrl}/api/v1/feedbacks/${created.id}/audio`, this._audioBlob, cfg.publicKey) : true;
@@ -756,8 +808,12 @@
       const S = this._strings;
       this._panel.innerHTML = `<div class="ok">${esc(S.thanks)}</div>
         ${warning ? `<div class="warn" role="alert">${esc(warning)}</div>` : ""}
-        <button class="btn js-again" type="button">${esc(S.sendAnother)}</button>`;
+        <div class="row" style="justify-content:center">
+          <button class="btn js-again" type="button">${esc(S.sendAnother)}</button>
+          ${canShowHistory() ? `<button class="btn js-history" type="button">${esc(S.myFeedback)}</button>` : ""}
+        </div>`;
       this._panel.querySelector(".js-again").addEventListener("click", () => this._render());
+      this._panel.querySelector(".js-history")?.addEventListener("click", () => this._openHistory());
       // Leave a warning on screen until the user has seen it.
       this._cancelAutoClose();
       if (!warning) {
@@ -766,6 +822,59 @@
           if (!this._inline) this._setOpen(false);
         }, 3000);
       }
+    }
+
+    /** Lists what this user sent before, with status and the team's replies. */
+    async _openHistory() {
+      const S = this._strings;
+      this._cancelAutoClose();
+      // Keep an unsent message so "Back" returns to it.
+      if (this._textarea?.isConnected) this._draft = this._textarea.value;
+      this._panel.innerHTML = `
+        <div class="header">
+          <button class="linkbtn js-back" type="button">← ${esc(S.back)}</button>
+          <button class="close" type="button" aria-label="${esc(S.close)}">${ICON_CLOSE}</button>
+        </div>
+        <h2 class="hist-title">${esc(S.myFeedback)}</h2>
+        <div class="js-hist" aria-live="polite"><div class="muted">${esc(S.loading)}</div></div>`;
+      this._panel.querySelector(".js-back").addEventListener("click", () => this._backToForm());
+      this._panel.querySelector(".close").addEventListener("click", () => this._setOpen(false));
+      const list = this._panel.querySelector(".js-hist");
+      try {
+        const items = await fetchHistory();
+        if (!list.isConnected) return;
+        list.innerHTML = items.length
+          ? items.map(i => this._historyItem(i)).join("")
+          : `<div class="muted">${esc(S.historyEmpty)}</div>`;
+      } catch (err) {
+        if (list.isConnected) list.innerHTML = `<div class="err">${esc(S.historyFailed)}</div>`;
+        window.AMiracleEcho._emit("error", { stage: "history", error: String(err) });
+      }
+    }
+
+    _backToForm() {
+      const draft = this._draft;
+      this._draft = null;
+      this._render();
+      if (draft) this._textarea.value = draft;
+      this._textarea.focus();
+    }
+
+    _historyItem(i) {
+      const S = this._strings;
+      const lang = resolveLocale(window.AMiracleEcho._config.locale);
+      const status = { new: S.statusNew, triaged: S.statusTriaged, resolved: S.statusResolved }[i.status] || i.status;
+      const text = (i.text || "").trim();
+      const excerpt = text ? (text.length > 280 ? text.slice(0, 280) + "…" : text) : (i.hasAudio ? S.voiceNote : "");
+      const extras = [i.hasAudio && text ? S.voiceNote : null, i.hasScreenshot ? S.withScreenshot : null].filter(Boolean);
+      const replies = (i.replies || []).map(r =>
+        `<div class="hist-reply"><div class="label">${esc(S.replyLabel)} · ${esc(fmtDate(r.sentAt, lang))}</div>${esc(r.message)}</div>`).join("");
+      return `<div class="hist-item">
+          <div class="hist-meta"><span>${esc(fmtDate(i.createdAt, lang))}</span><span class="pill pill-${esc(i.status)}">${esc(status)}</span></div>
+          ${excerpt ? `<div class="hist-text">${esc(excerpt)}</div>` : ""}
+          ${extras.length ? `<div class="label">${esc(extras.join(" · "))}</div>` : ""}
+          ${replies}
+        </div>`;
     }
 
     _cancelAutoClose() {
@@ -798,6 +907,8 @@
      */
     identify(id) { this._identity = id; },
     clearIdentity() { this._identity = null; },
+    /** Opens the panel on the user's previously sent feedback. */
+    openHistory() { const el = ensureElement(this._config); el._setOpen(true); el._openHistory(); },
     setMetadata(m) { this._metadata = Object.assign({}, this._metadata, m || {}); },
     setLocale(tag) {
       this._config.locale = tag || "en";
@@ -825,6 +936,48 @@
     if (!vars) return;
     const map = { primary: "--echo-primary", radius: "--echo-radius", font: "--echo-font", bg: "--echo-bg", text: "--echo-text", border: "--echo-border" };
     for (const [k, prop] of Object.entries(map)) if (vars[k]) el.style.setProperty(prop, vars[k]);
+  }
+
+  // Receipts prove this browser sent a feedback, so an anonymous user can see its status
+  // later. Kept per project and per identified user, so a shared device doesn't show
+  // one person's history to the next.
+  const MAX_RECEIPTS = 50;
+  function receiptKey() {
+    const cfg = window.AMiracleEcho._config;
+    const who = window.AMiracleEcho._identity?.id || "anon";
+    return `amiracle-echo:receipts:${cfg.projectId || cfg.publicKey}:${who}`;
+  }
+  function loadReceipts() {
+    try { const v = JSON.parse(localStorage.getItem(receiptKey()) || "[]"); return Array.isArray(v) ? v : []; }
+    catch (_) { return []; }
+  }
+  function saveReceipts(list) {
+    try { localStorage.setItem(receiptKey(), JSON.stringify(list.slice(0, MAX_RECEIPTS))); } catch (_) { }
+  }
+  function rememberReceipt(id, token) {
+    if (id && token) saveReceipts([{ id, token }].concat(loadReceipts().filter(r => r.id !== id)));
+  }
+  function canShowHistory() {
+    return loadReceipts().length > 0 || !!window.AMiracleEcho._identity?.hash;
+  }
+  async function fetchHistory() {
+    const api = window.AMiracleEcho, cfg = api._config, who = api._identity;
+    const receipts = loadReceipts();
+    const res = await fetch(`${cfg.serverUrl}/api/v1/feedbacks/history`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Echo-Project-Key": cfg.publicKey },
+      body: JSON.stringify({ receipts, submitter: who?.hash ? { id: who.id, hash: who.hash } : null }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    const data = await res.json();
+    // Forget receipts the server no longer has (deleted, or removed by retention).
+    const known = new Set(data.items.map(i => i.id));
+    saveReceipts(receipts.filter(r => known.has(r.id)));
+    return data.items;
+  }
+  function fmtDate(v, lang) {
+    try { return new Date(v).toLocaleDateString(lang, { year: "numeric", month: "short", day: "numeric" }); }
+    catch (_) { return String(v); }
   }
 
   // The element is mounted even when the bubble is off — open() needs something to

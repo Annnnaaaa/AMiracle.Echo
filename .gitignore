@@ -122,3 +122,6 @@ artifacts/
 TestResults/
 *.nupkg
 *.snupkg
+
+# Node dependencies (e.g. tests/widget-e2e) — restored with npm ci
+node_modules/
