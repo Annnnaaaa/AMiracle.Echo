@@ -46,4 +46,17 @@ public sealed class Submitter
     public string? Id { get; set; }
     public string? Email { get; set; }
     public string? Name { get; set; }
+
+    /// <summary>
+    /// HMAC-SHA256 of <see cref="Id"/>, computed by the host app's server with the
+    /// project's identity secret. Accepted on ingestion only; never stored.
+    /// </summary>
+    public string? Hash { get; set; }
+
+    /// <summary>
+    /// Set by the server, never trusted from the client: true when <see cref="Hash"/>
+    /// matched, false when a hash was sent but did not match, null when the
+    /// submission was unsigned (so the identity is only a claim).
+    /// </summary>
+    public bool? Verified { get; set; }
 }

@@ -1,0 +1,12 @@
+{
+  "name": "amiracle-echo-widget-e2e",
+  "private": true,
+  "description": "Browser tests for the embedded widget (src/AMiracle.Echo.Server/Resources/widget.js).",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

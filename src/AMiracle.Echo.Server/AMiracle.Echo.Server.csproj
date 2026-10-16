@@ -18,4 +18,8 @@
     <EmbeddedResource Include="Resources\widget.js" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="AMiracle.Echo.Tests" />
+  </ItemGroup>
+
 </Project>
