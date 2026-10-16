@@ -33,6 +33,9 @@ jobs:
       - name: Build (Release)
         run: dotnet build AMiracle.Echo.slnx --configuration Release --no-restore
 
+      - name: Test
+        run: dotnet test AMiracle.Echo.slnx --configuration Release --no-build
+
       - name: Pack
         run: dotnet pack AMiracle.Echo.slnx --configuration Release --no-build --output ./artifacts
 
@@ -43,3 +46,29 @@ jobs:
           name: nupkgs
           path: ./artifacts/*.*nupkg
           if-no-files-found: error
+
+  widget:
+    name: Widget in a real browser
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/widget-e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Screenshot capture, file attach, upload retry
+        # Run full Chromium headed (under xvfb) rather than the stripped-down headless
+        # shell, so getDisplayMedia behaves as it does for users.
+        run: xvfb-run --auto-servernum npx playwright test --headed

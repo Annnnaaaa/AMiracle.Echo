@@ -9,4 +9,7 @@
     <Project Path="src/AMiracle.Echo.Storage.EFCore/AMiracle.Echo.Storage.EFCore.csproj" />
     <Project Path="src/AMiracle.Echo.Storage.LocalFS/AMiracle.Echo.Storage.LocalFS.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AMiracle.Echo.Tests/AMiracle.Echo.Tests.csproj" />
+  </Folder>
 </Solution>

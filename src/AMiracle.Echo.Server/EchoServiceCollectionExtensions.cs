@@ -1,8 +1,10 @@
 using AMiracle.Echo.Abstractions.Configuration;
+using AMiracle.Echo.Abstractions.Email;
 using AMiracle.Echo.Abstractions.Processing;
 using AMiracle.Echo.Analysis.Abstractions;
 using AMiracle.Echo.Server.Endpoints;
 using AMiracle.Echo.Server.Services;
+using AMiracle.Echo.Server.Services.Email;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -31,6 +33,20 @@ public static class EchoServiceCollectionExtensions
     {
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<FeedbackIngestionService>();
+        services.AddSingleton<IdentityVerifier>();
+        services.AddHttpClient(ResendEmailSender.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(15));
+        // TryAdd: a host that registered its own IEchoEmailSender keeps it.
+        services.TryAddSingleton<IEchoEmailSender>(sp =>
+        {
+            var provider = sp.GetRequiredService<IOptions<EchoOptions>>().Value.Email.Provider.Trim().ToLowerInvariant();
+            return provider switch
+            {
+                "resend" => ActivatorUtilities.CreateInstance<ResendEmailSender>(sp),
+                "smtp" => ActivatorUtilities.CreateInstance<SmtpEmailSender>(sp),
+                "" => new DisabledEmailSender(),
+                _ => throw new InvalidOperationException($"Unknown AMiracle:Echo:Email:Provider '{provider}'. Use 'resend', 'smtp', or leave it empty."),
+            };
+        });
         services.AddSingleton<IFeedbackProcessor>(sp =>
         {
             var opts = sp.GetRequiredService<IOptions<EchoOptions>>().Value;

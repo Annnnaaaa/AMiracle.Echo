@@ -191,6 +191,12 @@ The server reads config via .NET's `IConfiguration` — `appsettings.json` is th
 | `AMiracle:Echo:BlobUploadWindowSeconds` | `AMiracle__Echo__BlobUploadWindowSeconds` | `300` | Promised blobs must arrive within this window or the row is reaped. |
 | `AMiracle:Echo:RetentionSweepIntervalMinutes` | `AMiracle__Echo__RetentionSweepIntervalMinutes` | `60` | How often the retention sweeper runs. |
 | `AMiracle:Echo:MaxFeedbackTextChars` | `AMiracle__Echo__MaxFeedbackTextChars` | `10000` | Text feedback over this is truncated. |
+| `AMiracle:Echo:IdentitySigningKey` | `AMiracle__Echo__IdentitySigningKey` | *(empty — off)* | Enables [signed identity](#signed-identity). Each project's identity secret is derived from it; rotating it rotates every project's secret. |
+| `AMiracle:Echo:Email:Provider` | `AMiracle__Echo__Email__Provider` | *(empty — off)* | `resend` or `smtp`. Turns on [replying to submitters](#replying-to-submitters). |
+| `AMiracle:Echo:Email:From` | `AMiracle__Echo__Email__From` | | Sender, e.g. `Echo <feedback@yourdomain.com>`. Must be a domain your provider lets you send from. |
+| `AMiracle:Echo:Email:ReplyTo` | `AMiracle__Echo__Email__ReplyTo` | | Optional. Where the submitter's answer goes. |
+| `AMiracle:Echo:Email:Resend:ApiKey` | `AMiracle__Echo__Email__Resend__ApiKey` | | Resend API key (keep it in a secret). |
+| `AMiracle:Echo:Email:Smtp:Host` / `Port` / `Username` / `Password` / `EnableSsl` | `AMiracle__Echo__Email__Smtp__Host` … | port `587`, SSL on | SMTP relay. |
 
 ---
 
@@ -214,11 +220,20 @@ The simplest case — one `<script>` tag:
 | `data-public-key` | ✓ | — | Public key from same response. |
 | `data-server-url` | | (inferred from script `src` origin) | Backend base URL if different. |
 | `data-position` | | `bottom-right` | `bottom-right`, `bottom-left`, `top-right`, `top-left`. |
-| `data-bubble` | | `on` | `off` to hide the floating bubble (use only inline `<amiracle-echo-form>`). |
+| `data-bubble` | | `on` | `off` to hide the floating bubble. Open the widget from your own button with `AMiracleEcho.open()`, or use inline `<amiracle-echo-form>`. |
+| `data-locale` | | `<html lang>`, then `en` | `en`, `hy` (Armenian), `ru`. Region tags fall back to the base language (`hy-AM` → `hy`); unknown ones to English. |
+| `data-theme` | | `auto` | `light`, `dark`, or `auto` (follow the OS). Set it when your app has its own theme toggle. |
 | `data-collect-contact` | | `off` | `optional` or `required` shows an email field when host hasn't called `identify()`. |
 | `data-categories` | | (off) | Set to `bug,idea,praise,question` to add a category selector. |
 | `data-consent-text` | | (off) | Adds a consent checkbox with this label; recorded with the feedback. |
 | `data-primary` | | `#4f46e5` | Theme color. |
+
+### Your own button (no bubble)
+
+```html
+<script src="/echo/widget.js" data-project-id="..." data-public-key="..." data-bubble="off" defer></script>
+<button onclick="AMiracleEcho.open()">Send feedback</button>
+```
 
 ### Inline mode (no bubble)
 
@@ -232,23 +247,66 @@ The simplest case — one `<script>` tag:
 ### JS API
 
 ```js
-AMiracleEcho.init({ projectId, publicKey, serverUrl, bubble, position });
-AMiracleEcho.open();
+AMiracleEcho.init({ projectId, publicKey, serverUrl, bubble, position, locale, theme });
+AMiracleEcho.open();   // works with the bubble off
 AMiracleEcho.close();
 
 // Pass through the logged-in user from your app. Widget hides name/email fields.
-AMiracleEcho.identify({ id: "user-123", email: "a@b.com", name: "Aram" });
+// Add `hash` to prove the identity — see Signed identity below.
+AMiracleEcho.identify({ id: "user-123", email: "a@b.com", name: "Aram", hash: "<from your server>" });
 AMiracleEcho.clearIdentity();
 
 // Attach arbitrary context to every submission.
 AMiracleEcho.setMetadata({ buildVersion: "1.2.3", tier: "pro", env: "production" });
 
-// Theming at runtime.
-AMiracleEcho.theme({ primary: "#10b981", radius: "16px", font: "Inter, sans-serif" });
+// Language at runtime (re-renders an open widget in place).
+AMiracleEcho.setLocale("hy");
 
-// Events: "opened", "submitted", "error".
-AMiracleEcho.on("submitted", ({ id }) => console.log("Submitted feedback", id));
+// Theming at runtime. `mode` follows your app's own light/dark toggle.
+AMiracleEcho.theme({ mode: "dark", primary: "#10b981", radius: "16px", font: "Inter, sans-serif" });
+
+// Events: "opened", "closed", "submitted", "error".
+AMiracleEcho.on("submitted", ({ id, attachmentsComplete }) => console.log("Submitted feedback", id, attachmentsComplete));
+// "error" carries { stage: "create" } when nothing was saved, or
+// { stage: "upload", id, audio, screenshot } when the feedback was saved but an attachment wasn't.
+AMiracleEcho.on("error", (e) => console.warn("Echo", e));
 ```
+
+### Screenshots
+
+Two separate choices:
+
+- **Add screenshot** captures the current tab with the browser's Screen Capture API
+  (the widget hides itself for the shot); the browser asks which tab to share each
+  time. Where that API is missing it uses `html2canvas` if your page loaded it. If
+  neither exists — most mobile browsers — the button isn't shown.
+- **Attach image** always opens the file picker, for a screenshot or photo the user
+  already has.
+
+### Signed identity
+
+`identify()` runs in the browser, and the public key is in your page source, so on
+its own a submitter is only a *claim* — anyone could send feedback as
+`ceo@yourcompany.com`. Signing makes it provable:
+
+1. Set `AMiracle__Echo__IdentitySigningKey` on the Echo server (any long random string).
+2. In the admin, open the project's **Show snippet**: it shows the project's identity
+   secret. Store it on **your** server — never in the page.
+3. On your server, sign the user's id and hand the hash to the page:
+
+```js
+// Node — same in any language: lowercase hex HMAC-SHA256(secret, user.id)
+const hash = crypto.createHmac("sha256", ECHO_IDENTITY_SECRET).update(user.id).digest("hex");
+```
+
+```js
+AMiracleEcho.identify({ id: user.id, email: user.email, hash });
+```
+
+The admin then badges each submitter **verified**, **unverified** (no hash sent), or
+**signature mismatch** (a hash was sent but doesn't match — treat as forged). The
+hash itself is never stored, and a client can't mark itself verified — the server
+always sets that flag.
 
 ### Mobile / Flutter
 
@@ -287,6 +345,16 @@ Auth: `Authorization: Bearer <admin-token>`.
 | `GET` | `/api/v1/admin/feedbacks/{id}/audio` |
 | `GET` | `/api/v1/admin/feedbacks/{id}/screenshot` |
 | `DELETE` | `/api/v1/admin/submitters/{submitterId}` (GDPR erasure) |
+| `POST` | `/api/v1/admin/feedbacks/{id}/reply` — `{ "message": "…", "resolve": true }` |
+| `GET` | `/api/v1/admin/capabilities` — `{ emailReplies, identitySigning }` |
+
+### Replying to submitters
+
+With `Email:Provider` set, the feedback detail in the admin page has a **Reply** box. Echo emails the submitter's address with your message and a short quote of what they wrote, records exactly what was sent in the comment thread (author *Reply to submitter*), and can mark the feedback resolved in the same step.
+
+- **Who it goes to.** The address is whatever the widget sent. Unless the project uses [signed identity](#signed-identity), anyone holding the public key could have typed someone else's address, so the admin page warns before you reply to an unsigned one. Write accordingly — don't put anything private in a reply to an unverified address.
+- **Errors.** `501` when email isn't configured, `409` when the feedback has no single plain address (lists, display names and header-injection attempts are refused), `502` when the provider rejects the message — nothing is recorded and the status is left alone.
+- **Other providers.** Register your own `IEchoEmailSender` before `AddAmiracleEcho()` and Echo uses it instead.
 
 ---
 
@@ -417,6 +485,9 @@ src/
   AMiracle.Echo.Storage.LocalFS/   IBlobStore (local filesystem)
   AMiracle.Echo.Cli/               `amiracle-echo` global tool
   AMiracle.Echo.Host/              ASP.NET Core host wrapping Server (used by Docker image)
+tests/
+  AMiracle.Echo.Tests/             xUnit: the endpoints on an in-memory server (`dotnet test`)
+  widget-e2e/                      Playwright: the widget in a real browser (`npm test`)
 docker/                            Dockerfile
 SPEC.md                            High-level design
 ROADMAP.md                         What's coming next

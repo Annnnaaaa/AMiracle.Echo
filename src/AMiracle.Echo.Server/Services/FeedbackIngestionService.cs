@@ -29,14 +29,17 @@ public sealed class FeedbackIngestionService
     private readonly EchoOptions _options;
     private readonly ILogger<FeedbackIngestionService> _logger;
     private readonly TimeProvider _clock;
+    private readonly IdentityVerifier _identity;
 
     public FeedbackIngestionService(
         IFeedbackStore store,
         IEnumerable<IFeedbackProcessor> processors,
         IOptions<EchoOptions> options,
         ILogger<FeedbackIngestionService> logger,
-        TimeProvider clock)
+        TimeProvider clock,
+        IdentityVerifier identity)
     {
+        _identity = identity;
         _store = store;
         _processors = processors;
         _options = options.Value;
@@ -50,6 +53,15 @@ public sealed class FeedbackIngestionService
             return IngestResult.Rejected("type-invalid", $"type must be 'text' or 'voice'");
         if (!FeedbackCategory.IsValid(input.Category))
             return IngestResult.Rejected("category-invalid", "category must be one of: bug, idea, praise, question");
+
+        // The submitter's identity is a claim from the browser. Verify the signature,
+        // drop it so it is never stored, and set Verified ourselves — a client-sent
+        // "verified": true must never survive.
+        if (input.Submitter is { } claimed)
+        {
+            claimed.Verified = _identity.Evaluate(projectId, claimed.Id, claimed.Hash);
+            claimed.Hash = null;
+        }
 
         var feedback = new Feedback
         {

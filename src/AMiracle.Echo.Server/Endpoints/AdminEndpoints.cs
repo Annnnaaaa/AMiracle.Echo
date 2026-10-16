@@ -1,10 +1,13 @@
 using AMiracle.Echo.Abstractions.Configuration;
+using AMiracle.Echo.Abstractions.Email;
 using AMiracle.Echo.Abstractions.Models;
 using AMiracle.Echo.Abstractions.Stores;
 using AMiracle.Echo.Server.Services;
+using AMiracle.Echo.Server.Services.Email;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AMiracle.Echo.Server.Endpoints;
@@ -20,6 +23,7 @@ internal static class AdminEndpoints
         group.MapGet("/projects/{id:guid}", GetProject);
         group.MapPatch("/projects/{id:guid}", UpdateProject);
         group.MapPost("/projects/{id:guid}/rotate-key", RotateKey);
+        group.MapGet("/projects/{id:guid}/identity-secret", GetIdentitySecret);
         group.MapDelete("/projects/{id:guid}", DeleteProject);
 
         group.MapGet("/feedbacks", ListFeedbacks);
@@ -35,6 +39,11 @@ internal static class AdminEndpoints
         group.MapGet("/feedbacks/{id:guid}/comments", ListComments);
         group.MapPost("/feedbacks/{id:guid}/comments", AddComment);
         group.MapDelete("/feedbacks/{id:guid}/comments/{commentId:guid}", DeleteComment);
+        group.MapPost("/feedbacks/{id:guid}/reply", ReplyToSubmitter);
+
+        // What this server can do, so the admin page only offers working actions.
+        group.MapGet("/capabilities", (IEchoEmailSender email, IdentityVerifier identity) =>
+            Results.Ok(new { emailReplies = email.IsConfigured, identitySigning = identity.Enabled }));
 
         group.MapGet("/stats", GetStats);
         group.MapGet("/feedbacks/export", ExportFeedbacks);
@@ -102,6 +111,14 @@ internal static class AdminEndpoints
         p.PublicKey = PublicKeyGenerator.Generate();
         var saved = await store.UpdateProjectAsync(p, ct);
         return Results.Ok(saved);
+    }
+
+    // Revealed to admins only. The host app keeps it server-side to sign user ids.
+    private static async Task<IResult> GetIdentitySecret(Guid id, IFeedbackStore store, IdentityVerifier identity, CancellationToken ct)
+    {
+        var p = await store.GetProjectAsync(id, ct);
+        if (p is null) return Results.NotFound();
+        return Results.Ok(new { enabled = identity.Enabled, secret = identity.ProjectSecret(p.Id) });
     }
 
     private static async Task<IResult> DeleteProject(Guid id, IFeedbackStore store, IBlobStore blobs, CancellationToken ct)
@@ -233,6 +250,54 @@ internal static class AdminEndpoints
         return Results.Created($"/api/v1/admin/feedbacks/{id}/comments/{c.Id}", c);
     }
 
+    public const string ReplyCommentAuthor = "Reply to submitter";
+
+    private static async Task<IResult> ReplyToSubmitter(
+        Guid id, ReplyRequest req, IFeedbackStore store, IEchoEmailSender email,
+        TimeProvider clock, ILoggerFactory loggers, CancellationToken ct)
+    {
+        if (!email.IsConfigured)
+            return Results.Problem(title: "Email isn't configured on this server.", detail: "Set AMiracle:Echo:Email (Provider, From and the provider's key) to reply from the admin.", statusCode: 501);
+        var message = req.Message?.Trim();
+        if (string.IsNullOrEmpty(message)) return Results.Problem(title: "Message required.", statusCode: 400);
+        if (message.Length > FeedbackReply.MaxMessageChars)
+            return Results.Problem(title: $"Message is longer than {FeedbackReply.MaxMessageChars} characters.", statusCode: 400);
+
+        var fb = await store.GetFeedbackAsync(id, ct);
+        if (fb is null) return Results.NotFound();
+        var to = FeedbackReply.SafeRecipient(fb.Submitter?.Email);
+        if (to is null)
+            return Results.Problem(title: "This feedback has no usable email address to reply to.", statusCode: 409);
+        var project = await store.GetProjectAsync(fb.ProjectId, ct);
+
+        try
+        {
+            await email.SendAsync(FeedbackReply.Build(to, project?.Name ?? "our app", fb, message), ct);
+        }
+        catch (EchoEmailException ex)
+        {
+            loggers.CreateLogger("AMiracle.Echo.Reply").LogWarning(ex, "Reply to feedback {FeedbackId} failed", id);
+            return Results.Problem(title: "The email provider didn't accept the reply.", detail: ex.Message, statusCode: 502);
+        }
+
+        // Keep a record in the triage thread of exactly what was sent, and to whom.
+        var comment = await store.AddCommentAsync(new FeedbackComment
+        {
+            FeedbackId = id,
+            Author = ReplyCommentAuthor,
+            Body = $"Emailed {to}:\n\n{message}",
+            CreatedAt = clock.GetUtcNow(),
+        }, ct);
+
+        if (req.Resolve == true && fb.Status != FeedbackStatus.Resolved)
+        {
+            fb.Status = FeedbackStatus.Resolved;
+            await store.UpdateFeedbackAsync(fb, ct);
+        }
+
+        return Results.Ok(new { sent = true, to, verified = fb.Submitter?.Verified, status = fb.Status, comment });
+    }
+
     private static async Task<IResult> DeleteComment(Guid id, Guid commentId, IFeedbackStore store, CancellationToken ct)
     {
         await store.DeleteCommentAsync(commentId, ct);
@@ -315,6 +380,7 @@ public sealed record CreateProjectRequest(string Name, List<string>? AllowedOrig
 public sealed record UpdateProjectRequest(string? Name, List<string>? AllowedOrigins, int? RetentionDays, bool? Archived);
 public sealed record UpdateFeedbackRequest(string? Status, short? Priority, string? Category, string? Assignee, string? Summary);
 public sealed record CreateCommentRequest(string Body, string Author);
+public sealed record ReplyRequest(string? Message, bool? Resolve);
 
 internal sealed class AdminTokenFilter : IEndpointFilter
 {

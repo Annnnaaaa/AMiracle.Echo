@@ -10,6 +10,7 @@ deploy/
 **/obj/
 **/TestResults/
 artifacts/
+tests/
 
 # Private managed-offering code
 src/AMiracle.Echo.Cloud/

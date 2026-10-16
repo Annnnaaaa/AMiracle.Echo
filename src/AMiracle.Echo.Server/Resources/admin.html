@@ -53,6 +53,9 @@
   .field { margin-bottom: 12px; }
   .field input, .field textarea { width: 100%; }
   .help-text { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .idbadge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .idbadge.ok { color: #15803d; border-color: #86efac; }
+  .idbadge.bad { color: #b91c1c; border-color: #fca5a5; }
 
   .pcard { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
   .pcard h2 { margin: 0 0 4px 0; font-size: 18px; font-weight: 600; }
@@ -92,6 +95,13 @@
   .comment { background: var(--row-hover); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 13px; }
   .comment .meta { color: var(--muted); font-size: 11px; margin-bottom: 2px; display:flex; justify-content:space-between; }
   .comment-add { display: grid; grid-template-columns: 130px 1fr auto; gap: 6px; margin-top: 8px; }
+  .comment .body { white-space: pre-wrap; }
+  .comment.reply { border-left: 3px solid var(--primary); }
+
+  /* Reply to submitter */
+  .reply-box textarea { width: 100%; min-height: 90px; box-sizing: border-box; font: inherit; }
+  .reply-box .actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+  .reply-warn { font-size: 12px; color: #b45309; margin: 4px 0; }
 
   /* Analysis pills */
   .analysis-bar { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
@@ -397,15 +407,31 @@ async function deleteActiveProject() {
     await loadProjects();
   } catch (e) { showError(e.message); }
 }
-function showSnippet() {
+async function showSnippet() {
   const p = state.activeProject;
   const url = location.origin + "/echo/widget.js";
+  let identity = "";
+  try {
+    const id = await api(`/admin/projects/${p.id}/identity-secret`);
+    identity = id.enabled
+      ? `<div style="margin-top:12px">Signed identity — keep this secret on <b>your server</b>, never in the page:</div>
+         <pre style="margin:8px 0 0 0">${esc(id.secret)}</pre>
+         <div class="help-text">Sign each user's id: <code>hash = hex(HMAC-SHA256(secret, user.id))</code>,
+         then call <code>AMiracleEcho.identify({ id, email, hash })</code>. Feedback with a valid hash shows as verified.</div>`
+      : `<div class="help-text" style="margin-top:12px">Signed identity is off. Set <code>AMiracle__Echo__IdentitySigningKey</code>
+         on the server to stop users from submitting as someone else.</div>`;
+  } catch (e) {
+    identity = `<div class="help-text" style="margin-top:12px">Couldn't load the identity secret: ${esc(e.message)}</div>`;
+  }
   showBanner("info", `
     <div>Drop this on your page (replace allowed origins as needed):</div>
     <pre style="margin:8px 0 0 0">&lt;script src="${url}"
         data-project-id="${esc(p.id)}"
         data-public-key="${esc(p.publicKey)}"
         defer&gt;&lt;/script&gt;</pre>
+    <div class="help-text">Optional: <code>data-bubble="off"</code> (open from your own button with
+    <code>AMiracleEcho.open()</code>), <code>data-locale="en|hy|ru"</code>, <code>data-theme="light|dark|auto"</code>.</div>
+    ${identity}
   `);
 }
 
@@ -496,7 +522,7 @@ function renderFeedbacksTable() {
       <td>${new Date(f.createdAt).toLocaleString()}</td>
       <td>${f.type}${f.type==='voice'&&f.audioBlobKey&&!String(f.audioBlobKey).startsWith('pending:') ? ' 🎤':''}${f.screenshotKey&&!String(f.screenshotKey).startsWith('pending:') ? ' 📎':''}</td>
       <td>${previewShort}${f.summary?'<div class="help-text" style="font-style:italic">summary by AI</div>':''}</td>
-      <td>${esc(f.submitter?.email || f.submitter?.name || f.submitter?.id || "")}</td>
+      <td>${esc(f.submitter?.email || f.submitter?.name || f.submitter?.id || "")} ${f.submitter?.verified === false ? identityBadge(f.submitter) : ""}</td>
       <td><span class="pill ${f.status}">${f.status}</span></td>
       <td>${priPill}</td>
       <td>${f.category ?? ""}</td>
@@ -602,7 +628,9 @@ async function openFeedback(id) {
   try {
     const fb = await api("/admin/feedbacks/" + id);
     state.comments = await api(`/admin/feedbacks/${id}/comments`);
+    if (!state.capabilities) state.capabilities = await api("/admin/capabilities").catch(() => ({}));
     $("#feedbackBody").innerHTML = renderFeedbackDetail(fb, state.comments);
+    $("#fbSendReply")?.addEventListener("click", () => sendReply(id));
     // Fetch screenshot / audio with bearer auth and wire object URLs into the tags.
     loadAuthedBlob(`/api/v1/admin/feedbacks/${id}/screenshot`, "#fbScreenshot", "#fbScreenshotStatus", true);
     loadAuthedBlob(`/api/v1/admin/feedbacks/${id}/audio`,     "#fbAudio",      "#fbAudioStatus",       false);
@@ -667,10 +695,57 @@ function rebindCommentDelete(feedbackId) {
 function renderComments(list, id) {
   if (!list.length) return `<div class="help-text">No comments yet.</div>`;
   return list.map(c => `
-    <div class="comment">
+    <div class="comment ${c.author === REPLY_AUTHOR ? "reply" : ""}">
       <div class="meta"><span>${esc(c.author)} · ${new Date(c.createdAt).toLocaleString()}</span><button class="ghost" data-del-comment="${c.id}" title="Delete comment">✕</button></div>
-      <div>${esc(c.body)}</div>
+      <div class="body">${esc(c.body)}</div>
     </div>`).join("");
+}
+
+// Must match AdminEndpoints.ReplyCommentAuthor.
+const REPLY_AUTHOR = "Reply to submitter";
+
+function renderReplyBox(f) {
+  const email = f.submitter?.email;
+  if (!email) return "";
+  if (!state.capabilities?.emailReplies) {
+    return `<div class="help-text">Replying by email is off on this server — set <code>AMiracle__Echo__Email__Provider</code>, <code>__From</code> and the provider key to turn it on. Meanwhile: <a href="mailto:${esc(email)}">email ${esc(email)}</a>.</div>`;
+  }
+  // An unsigned address is only what the browser claimed. Replying sends your words to
+  // whoever typed it — say so before the admin hits Send.
+  const warn = f.submitter.verified === true ? ""
+    : f.submitter.verified === false
+      ? `<div class="reply-warn">⚠ The signature on this identity didn't match. The address may be forged — don't include anything private.</div>`
+      : `<div class="reply-warn">This address wasn't signed by the app, so it's only what the sender typed. Don't include anything private.</div>`;
+  return `
+    <div class="reply-box">
+      <h3 style="margin:8px 0 4px 0;font-size:14px">Reply to ${esc(email)}</h3>
+      ${warn}
+      <textarea id="fbReplyText" maxlength="10000" placeholder="Write a reply. Their original message is quoted below it."></textarea>
+      <div class="actions">
+        <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" id="fbReplyResolve" ${f.status === "resolved" ? "" : "checked"}> Mark resolved</label>
+        <button class="primary" id="fbSendReply">Send reply</button>
+      </div>
+    </div>`;
+}
+
+async function sendReply(id) {
+  const box = $("#fbReplyText");
+  const message = box.value.trim();
+  if (!message) { showError("Write a reply first."); return; }
+  const btn = $("#fbSendReply");
+  btn.disabled = true; btn.textContent = "Sending…";
+  try {
+    const r = await api(`/admin/feedbacks/${id}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ message, resolve: $("#fbReplyResolve").checked }),
+    });
+    showInfo(`Reply sent to ${r.to}.`);
+    await openFeedback(id);
+    loadFeedbacks();
+  } catch (e) {
+    showError(e.message);
+    btn.disabled = false; btn.textContent = "Send reply";
+  }
 }
 
 function renderFeedbackDetail(f, comments) {
@@ -742,10 +817,21 @@ function renderFeedbackDetail(f, comments) {
         </div>
       </div>
 
+      ${renderReplyBox(f)}
+
       <details><summary>Submitter / metadata / page</summary>
         <pre>${esc(JSON.stringify({ submitter: f.submitter, customMetadata: f.customMetadata, pageUrl: f.pageUrl, userAgent: f.userAgent, consentText: f.consentText }, null, 2))}</pre>
       </details>
     </div>`;
+}
+
+// An unsigned submitter is only a claim from the browser — say so, rather than
+// letting a spoofed email read as fact.
+function identityBadge(s) {
+  if (!s || !(s.id || s.email || s.name)) return "";
+  if (s.verified === true) return `<span class="idbadge ok" title="Signed by the host app's server">verified</span>`;
+  if (s.verified === false) return `<span class="idbadge bad" title="A signature was sent but did not match — treat this identity as forged">signature mismatch</span>`;
+  return `<span class="idbadge" title="Not signed — anyone with the public key could claim this identity">unverified</span>`;
 }
 
 function renderSubmitter(s) {
@@ -754,7 +840,7 @@ function renderSubmitter(s) {
   if (s?.email) parts.push(`<a href="mailto:${esc(s.email)}">${esc(s.email)}</a>`);
   if (s?.id) parts.push(`<span class="help-text">id ${esc(s.id)}</span>`);
   return parts.length
-    ? `<div>From: ${parts.join(" · ")}</div>`
+    ? `<div>From: ${parts.join(" · ")} ${identityBadge(s)}</div>`
     : `<div class="help-text">From: anonymous — no submitter name, email or id was sent with this feedback.</div>`;
 }
 
