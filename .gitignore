@@ -125,3 +125,6 @@ TestResults/
 
 # Node dependencies (e.g. tests/widget-e2e) — restored with npm ci
 node_modules/
+
+# AMiracle.Audit keeps its per-repo files here: on disk for the dashboard, not in git
+.audit/
