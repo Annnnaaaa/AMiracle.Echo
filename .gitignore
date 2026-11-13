@@ -126,5 +126,8 @@ TestResults/
 # Node dependencies (e.g. tests/widget-e2e) — restored with npm ci
 node_modules/
 
-# AMiracle.Audit keeps its per-repo files here: on disk for the dashboard, not in git
-.audit/
+# AMiracle.Audit's files. In git: what its check needs in CI (which checks run, accepted findings).
+# Not in git: roadmaps, verdicts and pending diffs, which Audit keeps itself.
+.audit/*
+!.audit/audit.yml
+!.audit/suppressions.yml
